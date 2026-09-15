@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Olah Data EXCEL BOS EDS</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+
+    <h2>Data EXCEL BOS EDS</h2>
+    
+    <div id="controls">
+        <div class="upload-group">
+            <label>Upload Basis Data Utama:</label>
+            <input type="file" id="fileUploadMain" accept=".xlsx, .xls, .csv" />
+        </div>
+        <div class="upload-group" style="margin-top: 10px;">
+            <label>Upload Data Selesai (Otomatis "Selesai"):</label>
+            <input type="file" id="fileUploadDone" accept=".xlsx, .xls, .csv" />
+        </div>
+        
+        <input type="text" id="searchInput" placeholder="Cari data..." autocomplete="off" style="margin-top: 15px;">
+    </div>
+    
+    <div id="tableScrollWrapper">
+        <table id="dataTable">
+            <thead id="tableHead"></thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+        <div id="loadingIndicator">Memuat data...</div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
