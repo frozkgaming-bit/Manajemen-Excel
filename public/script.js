@@ -1,29 +1,43 @@
 async function sendToBackendInChunks(endpoint, dataArray, chunkSize = 1000) {
     let successCount = 0;
-    
-    // Memecah array data menjadi beberapa bagian (chunk)
+    const maxConcurrent = 3; // Kirim 3 batch secara bersamaan (paralel)
+    let promises = [];
+
     for (let i = 0; i < dataArray.length; i += chunkSize) {
         const chunk = dataArray.slice(i, i + chunkSize);
         
-        try {
-            console.log(`Mengirim batch baris ${i + 1} hingga ${i + chunk.length}...`);
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ dataList: chunk })
-            });
-            
+        console.log(`Menyiapkan batch baris ${i + 1} hingga ${i + chunk.length}...`);
+        
+        // Buat promise fetch tanpa await langsung
+        const requestPromise = fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dataList: chunk })
+        })
+        .then(async (response) => {
             const result = await response.json();
             if (!result.success) {
-                console.error(`Gagal pada batch baris ${i + 1}: ${result.error}`);
+                console.error(`Gagal pada batch: ${result.error}`);
             } else {
                 successCount += chunk.length;
             }
-        } catch (err) {
+        })
+        .catch(err => {
             console.error(`Koneksi terputus saat mengirim batch:`, err);
-            alert("Koneksi terputus di tengah proses pengiriman data.");
-            break; 
+        });
+
+        promises.push(requestPromise);
+
+        // Jika jumlah request paralel sudah mencapai batas, tunggu sampai selesai
+        if (promises.length >= maxConcurrent) {
+            await Promise.all(promises);
+            promises = []; // Kosongkan antrean
         }
+    }
+    
+    // Tunggu sisa batch yang mungkin belum selesai
+    if (promises.length > 0) {
+        await Promise.all(promises);
     }
     
     alert(`Selesai! Berhasil memproses ${successCount} dari ${dataArray.length} baris.`);
