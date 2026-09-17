@@ -94,7 +94,24 @@ document.getElementById('fileUploadMain').addEventListener('change', function(e)
 
         setupHeadersIfNeeded(newData[0]);
 
-        allData = allData.concat(newData);
+        // --- TAMBAHAN: HAPUS DUPLIKAT INTERNAL DALAM 1 FILE EXCEL ---
+        let uniqueMap = new Map();
+        newData.forEach(item => {
+            item['keterangan'] = "Belum Selesai";
+            // Buat signature unik berdasarkan seluruh kolom (kecuali keterangan)
+            let signature = headers
+                .filter(header => header !== 'keterangan')
+                .map(header => (item[header] !== undefined && item[header] !== null ? item[header].toString().trim() : ''))
+                .join('__');
+            
+            // Hanya ambil baris terakhir/unik jika ada yang kembar di file yang sama
+            uniqueMap.set(signature, item);
+        });
+        
+        let cleanedNewData = Array.from(uniqueMap.values());
+        // ------------------------------------------------------------
+
+        allData = allData.concat(cleanedNewData);
         
         searchInput.value = ""; 
         filteredData = [...allData]; 
@@ -104,7 +121,7 @@ document.getElementById('fileUploadMain').addEventListener('change', function(e)
         loadMoreData();
         
         // --- TAMBAHKAN BARIS INI UNTUK MENGIRIM KE SUPABASE ---
-        sendToBackendInChunks('/api/upload-main', newData, 1000);
+        sendToBackendInChunks('/api/upload-main', cleanedNewData, 1000);
         // ------------------------------------------------------
         
         e.target.value = ""; 
@@ -144,6 +161,23 @@ document.getElementById('fileUploadDone').addEventListener('change', function(e)
 
         setupHeadersIfNeeded(newData[0]);
 
+        // --- TAMBAHAN: HAPUS DUPLIKAT INTERNAL DALAM 1 FILE EXCEL ---
+        let uniqueMap = new Map();
+        newData.forEach(item => {
+            item['keterangan'] = "Selesai";
+            // Buat signature unik berdasarkan seluruh kolom (kecuali keterangan)
+            let signature = headers
+                .filter(header => header !== 'keterangan')
+                .map(header => (item[header] !== undefined && item[header] !== null ? item[header].toString().trim() : ''))
+                .join('__');
+            
+            // Hanya ambil baris terakhir/unik jika ada yang kembar di file yang sama
+            uniqueMap.set(signature, item);
+        });
+        
+        let cleanedNewData = Array.from(uniqueMap.values());
+        // ------------------------------------------------------------
+
         let mapIndex = new Map();
         allData.forEach((item, idx) => {
             let signature = headers
@@ -153,9 +187,7 @@ document.getElementById('fileUploadDone').addEventListener('change', function(e)
             mapIndex.set(signature, idx);
         });
 
-        newData.forEach(newItem => {
-            newItem['keterangan'] = "Selesai";
-
+        cleanedNewData.forEach(newItem => {
             let newSignature = headers
                 .filter(header => header !== 'keterangan')
                 .map(header => (newItem[header] !== undefined && newItem[header] !== null ? newItem[header].toString().trim() : ''))
@@ -178,7 +210,7 @@ document.getElementById('fileUploadDone').addEventListener('change', function(e)
         loadMoreData();
         
         // --- TAMBAHKAN BARIS INI UNTUK MENGIRIM KE SUPABASE ---
-        sendToBackendInChunks('/api/upload-done', newData, 1000);
+        sendToBackendInChunks('/api/upload-done', cleanedNewData, 1000);
         // ------------------------------------------------------
         
         e.target.value = ""; 
