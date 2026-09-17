@@ -49,6 +49,11 @@ let headers = [];
 let currentIndex = 0; 
 const batchSize = 50; 
 
+// Pagination state untuk pull data
+let currentPullPage = 1;
+let isPulling = false;
+let hasMorePullData = true; 
+
 const tableBody = document.getElementById('tableBody');
 const tableHead = document.getElementById('tableHead');
 const scrollWrapper = document.getElementById('tableScrollWrapper');
@@ -318,49 +323,67 @@ function updateDataCount() {
 
 scrollWrapper.addEventListener('scroll', function() {
     if (scrollWrapper.scrollTop + scrollWrapper.clientHeight >= scrollWrapper.scrollHeight - 5) {
-        loadMoreData();
+        if (currentIndex < filteredData.length) {
+            loadMoreData();
+        } else {
+            fetchPaginatedData();
+        }
     }
 });
 
 document.getElementById('btnPullData').addEventListener('click', async function() {
-    const loadingIndicator = document.getElementById('loadingIndicator');
+    currentPullPage = 1;
+    hasMorePullData = true;
+    allData = []; 
+    filteredData = [];
+    currentIndex = 0;
+    document.getElementById('tableBody').innerHTML = "";
+    document.getElementById('searchInput').value = "";
     
+    await fetchPaginatedData();
+});
+
+async function fetchPaginatedData() {
+    if (isPulling || !hasMorePullData) return;
+    
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    isPulling = true;
+    loadingIndicator.style.display = "block";
+
     try {
-        loadingIndicator.style.display = "block";
-        
-        const response = await fetch('/api/pull-data');
+        const response = await fetch(`/api/pull-data?page=${currentPullPage}&limit=1000`);
         const result = await response.json();
 
         if (result.success && result.data.length > 0) {
-            let fetchedData = result.data.map(function(row) {
+            let fetchedData = result.data.map(row => {
                 let lowerRow = {};
-                for (let key in row) {
-                    lowerRow[key.toLowerCase()] = row[key];
-                }
+                for (let key in row) lowerRow[key.toLowerCase()] = row[key];
                 return lowerRow;
             });
 
             setupHeadersIfNeeded(fetchedData[0]);
-
-            allData = fetchedData;
+            
+            allData = allData.concat(fetchedData);
             filteredData = [...allData];
-            currentIndex = 0;
-            document.getElementById('tableBody').innerHTML = "";
-
+            
             loadMoreData();
             updateDataCount();
             
-            document.getElementById('searchInput').value = "";
-            alert(`Selesai! Berhasil menarik ${fetchedData.length} baris data dari Supabase.`);
-        } else if (result.success && result.data.length === 0) {
-            alert("Database Supabase saat ini kosong.");
+            if (result.data.length < result.limit) {
+                hasMorePullData = false;
+            } else {
+                currentPullPage++;
+            }
         } else {
-            throw new Error(result.error);
+            hasMorePullData = false;
+            if (currentPullPage === 1) {
+                alert("Database Supabase saat ini kosong.");
+            }
         }
     } catch (error) {
-        console.error("Gagal menarik data dari Supabase:", error);
-        alert(`Terjadi kesalahan: ${error.message}`);
+        alert(`Gagal menarik data: ${error.message}`);
     } finally {
+        isPulling = false;
         loadingIndicator.style.display = "none";
     }
-});
+}
