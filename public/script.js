@@ -53,6 +53,8 @@ const batchSize = 50;
 let currentPullPage = 1;
 let isPulling = false;
 let hasMorePullData = true; 
+let currentSearchTerm = "";
+let searchTimeout = null; 
 
 const tableBody = document.getElementById('tableBody');
 const tableHead = document.getElementById('tableHead');
@@ -241,19 +243,19 @@ document.getElementById('fileUploadDone').addEventListener('change', function(e)
 });
 
 searchInput.addEventListener('input', function(e) {
-    let searchTerm = e.target.value.toLowerCase();
+    currentSearchTerm = e.target.value.trim();
     
-    filteredData = allData.filter(function(row) {
-        return headers.some(function(header) {
-            let cellValue = row[header] ? row[header].toString().toLowerCase() : "";
-            return cellValue.includes(searchTerm);
-        });
-    });
-
-    currentIndex = 0;
-    tableBody.innerHTML = "";
-    loadMoreData();
-    updateDataCount();
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+        currentPullPage = 1;
+        hasMorePullData = true;
+        allData = []; 
+        filteredData = [];
+        currentIndex = 0;
+        document.getElementById('tableBody').innerHTML = "";
+        
+        fetchPaginatedData();
+    }, 500);
 });
 
 function loadMoreData() {
@@ -351,7 +353,8 @@ async function fetchPaginatedData() {
     loadingIndicator.style.display = "block";
 
     try {
-        const response = await fetch(`/api/pull-data?page=${currentPullPage}&limit=1000`);
+        const url = `/api/pull-data?page=${currentPullPage}&limit=50&search=${encodeURIComponent(currentSearchTerm)}`;
+        const response = await fetch(url);
         const result = await response.json();
 
         if (result.success && result.data.length > 0) {
@@ -366,8 +369,9 @@ async function fetchPaginatedData() {
             allData = allData.concat(fetchedData);
             filteredData = [...allData];
             
-            loadMoreData();
-            updateDataCount();
+            loadMoreData(); 
+            
+            document.getElementById('countTotal').innerText = result.count;
             
             if (result.data.length < result.limit) {
                 hasMorePullData = false;
@@ -377,11 +381,11 @@ async function fetchPaginatedData() {
         } else {
             hasMorePullData = false;
             if (currentPullPage === 1) {
-                alert("Database Supabase saat ini kosong.");
+                document.getElementById('tableBody').innerHTML = "<tr><td colspan='100%' style='text-align:center;'>Data tidak ditemukan</td></tr>";
             }
         }
     } catch (error) {
-        alert(`Gagal menarik data: ${error.message}`);
+        console.error("Error fetching data:", error);
     } finally {
         isPulling = false;
         loadingIndicator.style.display = "none";
