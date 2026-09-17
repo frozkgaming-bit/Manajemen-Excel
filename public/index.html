@@ -22,6 +22,14 @@
         </div>
         
         <input type="text" id="searchInput" placeholder="Cari data..." autocomplete="off" style="margin-top: 15px;">
+        <div id="dataSummary" style="margin-top: 15px; padding: 10px; background-color: #e9ecef; border-radius: 5px; font-weight: bold; border: 1px solid #ccc;">
+            📊 Total Data: <span id="countTotal" style="color: blue;">0</span> | 
+            ✅ Selesai: <span id="countSelesai" style="color: green;">0</span> | 
+            ⏳ Belum Selesai: <span id="countBelum" style="color: red;">0</span>
+            <span id="filterSummary" style="display: none; margin-left: 10px; padding-left: 10px; border-left: 2px solid #aaa;">
+                🔍 Ditemukan: <span id="countFiltered" style="color: #d35400;">0</span>
+            </span>
+        </div>
     </div>
     
     <div id="tableScrollWrapper">

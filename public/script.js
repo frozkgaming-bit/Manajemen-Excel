@@ -1,6 +1,6 @@
 async function sendToBackendInChunks(endpoint, dataArray, chunkSize = 1000) {
     let successCount = 0;
-    const maxConcurrent = 3; // Kirim 3 batch secara bersamaan (paralel)
+    const maxConcurrent = 5; // Kirim 3 batch secara bersamaan (paralel)
     let promises = [];
 
     for (let i = 0; i < dataArray.length; i += chunkSize) {
@@ -133,6 +133,7 @@ document.getElementById('fileUploadMain').addEventListener('change', function(e)
         tableBody.innerHTML = ""; 
         
         loadMoreData();
+        updateDataCount();
         
         // --- TAMBAHKAN BARIS INI UNTUK MENGIRIM KE SUPABASE ---
         sendToBackendInChunks('/api/upload-main', cleanedNewData, 1000);
@@ -222,6 +223,7 @@ document.getElementById('fileUploadDone').addEventListener('change', function(e)
         tableBody.innerHTML = ""; 
         
         loadMoreData();
+        updateDataCount();
         
         // --- TAMBAHKAN BARIS INI UNTUK MENGIRIM KE SUPABASE ---
         sendToBackendInChunks('/api/upload-done', cleanedNewData, 1000);
@@ -246,6 +248,7 @@ searchInput.addEventListener('input', function(e) {
     currentIndex = 0;
     tableBody.innerHTML = "";
     loadMoreData();
+    updateDataCount();
 });
 
 function loadMoreData() {
@@ -281,6 +284,36 @@ function loadMoreData() {
     tableBody.insertAdjacentHTML('beforeend', rowsHtml);
     currentIndex = endIndex;
     loadingIndicator.style.display = "none";
+}
+
+// Fungsi untuk memperbarui tampilan jumlah data
+function updateDataCount() {
+    // 1. Hitung total data
+    const total = allData.length;
+    
+    // 2. Hitung jumlah yang 'Selesai'
+    const selesai = allData.filter(row => 
+        row['keterangan'] && row['keterangan'].toLowerCase() === 'selesai'
+    ).length;
+    
+    // 3. Hitung jumlah yang 'Belum Selesai'
+    const belum = total - selesai;
+    
+    // Update teks di HTML
+    document.getElementById('countTotal').innerText = total;
+    document.getElementById('countSelesai').innerText = selesai;
+    document.getElementById('countBelum').innerText = belum;
+    
+    // 4. Hitung data yang difilter (jika sedang melakukan pencarian)
+    const searchVal = document.getElementById('searchInput').value;
+    const filterSummary = document.getElementById('filterSummary');
+    
+    if (searchVal.trim() !== "") {
+        filterSummary.style.display = "inline-block";
+        document.getElementById('countFiltered').innerText = filteredData.length;
+    } else {
+        filterSummary.style.display = "none";
+    }
 }
 
 scrollWrapper.addEventListener('scroll', function() {
