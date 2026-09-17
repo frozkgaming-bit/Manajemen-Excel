@@ -321,3 +321,46 @@ scrollWrapper.addEventListener('scroll', function() {
         loadMoreData();
     }
 });
+
+document.getElementById('btnPullData').addEventListener('click', async function() {
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    
+    try {
+        loadingIndicator.style.display = "block";
+        
+        const response = await fetch('/api/pull-data');
+        const result = await response.json();
+
+        if (result.success && result.data.length > 0) {
+            let fetchedData = result.data.map(function(row) {
+                let lowerRow = {};
+                for (let key in row) {
+                    lowerRow[key.toLowerCase()] = row[key];
+                }
+                return lowerRow;
+            });
+
+            setupHeadersIfNeeded(fetchedData[0]);
+
+            allData = fetchedData;
+            filteredData = [...allData];
+            currentIndex = 0;
+            document.getElementById('tableBody').innerHTML = "";
+
+            loadMoreData();
+            updateDataCount();
+            
+            document.getElementById('searchInput').value = "";
+            alert(`Selesai! Berhasil menarik ${fetchedData.length} baris data dari Supabase.`);
+        } else if (result.success && result.data.length === 0) {
+            alert("Database Supabase saat ini kosong.");
+        } else {
+            throw new Error(result.error);
+        }
+    } catch (error) {
+        console.error("Gagal menarik data dari Supabase:", error);
+        alert(`Terjadi kesalahan: ${error.message}`);
+    } finally {
+        loadingIndicator.style.display = "none";
+    }
+});
