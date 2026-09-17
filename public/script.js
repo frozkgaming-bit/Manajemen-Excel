@@ -140,7 +140,7 @@ document.getElementById('fileUploadMain').addEventListener('change', function(e)
         tableBody.innerHTML = ""; 
         
         loadMoreData();
-        updateDataCount();
+        fetchServerCounts();
         
         // --- TAMBAHKAN BARIS INI UNTUK MENGIRIM KE SUPABASE ---
         sendToBackendInChunks('/api/upload-main', cleanedNewData, 1000);
@@ -230,7 +230,7 @@ document.getElementById('fileUploadDone').addEventListener('change', function(e)
         tableBody.innerHTML = ""; 
         
         loadMoreData();
-        updateDataCount();
+        fetchServerCounts();
         
         // --- TAMBAHKAN BARIS INI UNTUK MENGIRIM KE SUPABASE ---
         sendToBackendInChunks('/api/upload-done', cleanedNewData, 1000);
@@ -294,33 +294,10 @@ function loadMoreData() {
 }
 
 // Fungsi untuk memperbarui tampilan jumlah data
+// Ponytail: Fungsi ini dihentikan karena perhitungan beralih ke server-side.
+// Gunakan fetchServerCounts() untuk sinkronisasi dengan database.
 function updateDataCount() {
-    // 1. Hitung total data
-    const total = allData.length;
-    
-    // 2. Hitung jumlah yang 'Selesai'
-    const selesai = allData.filter(row => 
-        row['keterangan'] && row['keterangan'].toLowerCase() === 'selesai'
-    ).length;
-    
-    // 3. Hitung jumlah yang 'Belum Selesai'
-    const belum = total - selesai;
-    
-    // Update teks di HTML
-    document.getElementById('countTotal').innerText = total;
-    document.getElementById('countSelesai').innerText = selesai;
-    document.getElementById('countBelum').innerText = belum;
-    
-    // 4. Hitung data yang difilter (jika sedang melakukan pencarian)
-    const searchVal = document.getElementById('searchInput').value;
-    const filterSummary = document.getElementById('filterSummary');
-    
-    if (searchVal.trim() !== "") {
-        filterSummary.style.display = "inline-block";
-        document.getElementById('countFiltered').innerText = filteredData.length;
-    } else {
-        filterSummary.style.display = "none";
-    }
+    return;
 }
 
 scrollWrapper.addEventListener('scroll', function() {
@@ -333,18 +310,52 @@ scrollWrapper.addEventListener('scroll', function() {
     }
 });
 
+// 1. Fungsi untuk menarik perhitungan global dari server
+async function fetchServerCounts() {
+    try {
+        const response = await fetch('/api/get-counts');
+        const result = await response.json();
+
+        if (result.success) {
+            document.getElementById('countTotal').innerText = result.total;
+            document.getElementById('countSelesai').innerText = result.selesai;
+            document.getElementById('countBelum').innerText = result.belum;
+        }
+    } catch (error) {
+        console.error("Gagal mengambil jumlah data dari server:", error);
+    }
+}
+
 document.getElementById('btnPullData').addEventListener('click', async function() {
     currentPullPage = 1;
     hasMorePullData = true;
     allData = []; 
-    filteredData = [];
-    currentIndex = 0;
     document.getElementById('tableBody').innerHTML = "";
-    document.getElementById('searchInput').value = "";
+    document.getElementById('searchInput').value = ""; // Reset input pencarian
+    currentSearchTerm = "";
     
+    // Perbarui total data dari database
+    fetchServerCounts();
+    // Mulai tarik data ke tabel
     await fetchPaginatedData();
 });
 
+// 3. Event Listener untuk Input Pencarian (Hanya memengaruhi tabel & "Ditemukan")
+document.getElementById('searchInput').addEventListener('input', function(e) {
+    currentSearchTerm = e.target.value.trim();
+    
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+        currentPullPage = 1;
+        hasMorePullData = true;
+        allData = []; 
+        document.getElementById('tableBody').innerHTML = "";
+        
+        fetchPaginatedData();
+    }, 500);
+});
+
+// 4. Fungsi untuk menarik data tabel (beserta pagination & search)
 async function fetchPaginatedData() {
     if (isPulling || !hasMorePullData) return;
     
@@ -365,13 +376,19 @@ async function fetchPaginatedData() {
             });
 
             setupHeadersIfNeeded(fetchedData[0]);
-            
             allData = allData.concat(fetchedData);
             filteredData = [...allData];
             
             loadMoreData(); 
-            
-            document.getElementById('countTotal').innerText = result.count;
+
+            // HANYA UPDATE ANGKA "DITEMUKAN" SAAT MENCARI
+            const filterSummary = document.getElementById('filterSummary');
+            if (currentSearchTerm !== "") {
+                filterSummary.style.display = "inline-block";
+                document.getElementById('countFiltered').innerText = result.count; 
+            } else {
+                filterSummary.style.display = "none";
+            }
             
             if (result.data.length < result.limit) {
                 hasMorePullData = false;
@@ -382,6 +399,11 @@ async function fetchPaginatedData() {
             hasMorePullData = false;
             if (currentPullPage === 1) {
                 document.getElementById('tableBody').innerHTML = "<tr><td colspan='100%' style='text-align:center;'>Data tidak ditemukan</td></tr>";
+                
+                if (currentSearchTerm !== "") {
+                    document.getElementById('filterSummary').style.display = "inline-block";
+                    document.getElementById('countFiltered').innerText = 0;
+                }
             }
         }
     } catch (error) {
