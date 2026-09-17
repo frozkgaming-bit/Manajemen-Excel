@@ -413,3 +413,67 @@ async function fetchPaginatedData() {
         loadingIndicator.style.display = "none";
     }
 }
+
+// Event listener untuk tombol Print Seluruh Data
+document.getElementById('btnPrint').addEventListener('click', function() {
+    if (allData.length === 0) {
+        alert("Tidak ada data untuk diprint. Silakan tarik atau upload data terlebih dahulu.");
+        return;
+    }
+
+    // Membuka jendela baru untuk tampilan print
+    let printWindow = window.open('', '_blank');
+    
+    // Menyusun isi HTML dan tabel
+    let htmlContent = `
+    <!DOCTYPE html>
+    <html lang="id">
+    <head>
+        <meta charset="UTF-8">
+        <title>Print Data EXCEL BOS EDS</title>
+        <style>
+            body { font-family: sans-serif; margin: 20px; }
+            table { border-collapse: collapse; width: 100%; font-size: 12px; }
+            th, td { border: 1px solid black; padding: 6px; text-align: left; }
+            th { background-color: #f2f2f2; }
+            /* Memastikan background hijau tercetak */
+            .row-hijau { background-color: #ccffcc !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            h2 { text-align: center; }
+            @media print {
+                @page { margin: 1cm; }
+            }
+        </style>
+    </head>
+    <body>
+        <h2>Data EXCEL BOS EDS</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 40px; text-align: center;">No</th>
+                    ${headers.map(h => `<th>${h.toUpperCase()}</th>`).join('')}
+                </tr>
+            </thead>
+            <tbody>
+                ${allData.map((row, i) => {
+                    let isSelesai = row['keterangan'] && row['keterangan'].toLowerCase() === 'selesai';
+                    return `
+                    <tr class="${isSelesai ? 'row-hijau' : ''}">
+                        <td style="text-align: center;"><b>${i + 1}</b></td>
+                        ${headers.map(h => `<td>${row[h] !== undefined ? row[h] : ''}</td>`).join('')}
+                    </tr>`;
+                }).join('')}
+            </tbody>
+        </table>
+        <script>
+            // Jalankan print dialog setelah data dimuat
+            window.onload = function() {
+                window.print();
+            };
+        </script>
+    </body>
+    </html>\`;
+
+    // Menuliskan konten ke jendela print
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+});
