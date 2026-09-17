@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -11,12 +11,17 @@ export default async function handler(req, res) {
     const { dataList } = req.body;
     const formattedData = dataList.map(item => ({
       ...item,
-      Keterangan: "Belum Selesai" // Label status awal [cite: 2]
+      keterangan: "Belum Selesai" // Pastikan menggunakan huruf kecil jika tabel Supabase Anda huruf kecil
     }));
 
+    // UBAH DARI .insert() MENJADI .upsert()
     const { data, error } = await supabase
       .from('kwalitas_data_cimahi')
-      .insert(formattedData);
+      .upsert(formattedData, {
+        // Pastikan nama kolom di bawah ini sesuai dengan huruf besar/kecil di tabel Supabase Anda
+        onConflict: 'kelurahan,nomor_hak,surat_ukur,nib,luas,produk,luas_peta,validator_tekstual,validator_peta,blokir_internal,kw,pemilik_pertama,pemilik_akhir,tipe_hak',
+        ignoreDuplicates: true // PENTING: Set true agar sistem sekadar melewati data yang sudah ada (skip)
+      });
 
     if (error) throw error;
 

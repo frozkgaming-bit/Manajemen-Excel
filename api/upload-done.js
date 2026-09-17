@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -11,14 +11,14 @@ export default async function handler(req, res) {
     const { dataList } = req.body;
     const formattedData = dataList.map(item => ({
       ...item,
-      Keterangan: "Selesai" // Label status selesai [cite: 2]
+      keterangan: "Selesai" // Label status selesai [cite: 2]
     }));
 
     // Upsert sensitif terhadap 14 field (kecuali id & Keterangan) [cite: 1]
     const { data, error } = await supabase
       .from('kwalitas_data_cimahi')
       .upsert(formattedData, {
-        onConflict: 'Kelurahan,Nomor_Hak,Surat_Ukur,NIB,Luas,Produk,Luas_Peta,Validator_Tekstual,Validator_Peta,Blokir_Internal,KW,Pemilik_Pertama,Pemilik_Akhir,Tipe_Hak',
+        onConflict: 'kelurahan,nomor_hak,surat_ukur,nib,luas,produk,luas_peta,validator_tekstual,validator_peta,blokir_internal,kw,pemilik_pertama,pemilik_akhir,tipe_hak',
         ignoreDuplicates: false // Timpa (update) jika seluruh field cocok, insert jika ada yang beda [cite: 1]
       });
 
