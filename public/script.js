@@ -79,13 +79,10 @@ btnLogout.addEventListener('click', async () => {
 checkUser();
 
 // --- FUNGSI CRUD: UPLOAD/UPSERT ---
-async function sendToBackendInChunks(dataArray, chunkSize = 1000) {
+async function sendToBackendInChunks(dataArray, chunkSize = 10000) {
     if (!dataArray || dataArray.length === 0) return;
 
     let successCount = 0;
-    const maxConcurrent = 3; // Maksimal 3 request paralel
-    let promises = [];
-    
     const totalChunks = Math.ceil(dataArray.length / chunkSize);
     
     // Tampilkan indikator progres di UI
@@ -99,39 +96,27 @@ async function sendToBackendInChunks(dataArray, chunkSize = 1000) {
     uploadMain.disabled = true;
     uploadDone.disabled = true;
 
-    // Looping untuk memecah data dan mengirim secara paralel
+    // Looping SECARA SEKUENSIAL (Satu per satu) untuk menjamin urutan ID di database
     for (let i = 0; i < totalChunks; i++) {
         const from = i * chunkSize;
         const chunk = dataArray.slice(from, from + chunkSize);
         console.log(`Mengirim batch baris ${from + 1} hingga ${from + chunk.length}...`);
         
-        // Buat Promise untuk dikirim ke Supabase tanpa langsung di-await
-        const requestPromise = supabaseClient
+        // PENTING: Gunakan 'await' langsung di sini.
+        // Server akan memproses dan mengurutkan ID batch ini sebelum lanjut ke batch berikutnya.
+        const { error } = await supabaseClient
             .from(TABLE_NAME)
-            .upsert(chunk, { onConflict: 'kelurahan,nomor_hak,surat_ukur,nib,luas,produk,luas_peta,validator_tekstual,validator_peta,blokir_internal,kw,pemilik_pertama,pemilik_akhir,tipe_hak' })
-            .then(({ error }) => {
-                if (error) {
-                    console.error(`Gagal pada batch ${from + 1}:`, error.message);
-                } else {
-                    // Update jumlah sukses
-                    successCount += chunk.length;
-                }
-                // Update teks di layar untuk memberitahu user (Real-time Feedback)
-                loadingIndicator.innerText = `Mengunggah ${successCount} / ${dataArray.length} baris ke server...`;
-            });
+            .upsert(chunk, { onConflict: 'kelurahan,nomor_hak,surat_ukur,nib,luas,produk,luas_peta,validator_tekstual,validator_peta,blokir_internal,kw,pemilik_pertama,pemilik_akhir,tipe_hak' });
 
-        promises.push(requestPromise);
-
-        // Jika jumlah request yang berjalan mencapai limit (3), tunggu ketiganya selesai dulu
-        if (promises.length >= maxConcurrent) {
-            await Promise.all(promises);
-            promises = []; // Kosongkan antrean, lanjut ke kelompok batch berikutnya
+        if (error) {
+            console.error(`Gagal pada batch ${from + 1}:`, error.message);
+        } else {
+            // Update jumlah sukses
+            successCount += chunk.length;
         }
-    }
-
-    // Tunggu sisa request terakhir jika jumlah batch tidak genap kelipatan 3
-    if (promises.length > 0) {
-        await Promise.all(promises);
+        
+        // Update teks di layar untuk memberitahu user
+        loadingIndicator.innerText = `Mengunggah ${successCount} / ${dataArray.length} baris ke server...`;
     }
 
     // Kembalikan UI ke kondisi semula
