@@ -30,6 +30,14 @@ let hasMorePullData = true;
 let currentSearchTerm = "";
 let searchTimeout = null;
 
+// Daftar kolom disesuaikan persis dengan SQL definition (tanpa id dan created_at)
+const DB_COLUMNS = [
+    'kelurahan', 'nomor_hak', 'surat_ukur', 'nib', 'luas', 
+    'produk', 'luas_peta', 'validator_tekstual', 'validator_peta', 
+    'blokir_internal', 'kw', 'pemilik_pertama', 'pemilik_akhir', 
+    'tipe_hak', 'keterangan'
+];
+
 // --- AUTENTIKASI ---
 async function checkUser() {
     const { data: { session } } = await supabaseClient.auth.getSession();
@@ -122,30 +130,25 @@ async function fetchPaginatedData() {
         const limit = 50;
         const from = (currentPullPage - 1) * limit;
         const to = from + limit - 1;
-
+        
         let query = supabaseClient.from(TABLE_NAME).select('*').range(from, to);
-
+        
+        // PENCARIAN BERDASARKAN SKEMA SQL TERBARU
         if (currentSearchTerm !== "") {
-            const textColumns = ['kelurahan','surat_ukur','produk','validator_tekstual','validator_peta','blokir_internal','pemilik_pertama','pemilik_akhir','tipe_hak','keterangan'];
-            const numericColumns = ['nomor_hak','nib','luas','luas_peta','kw'];
-
-            const textFilters = textColumns.map(col => `${col}.ilike.%${currentSearchTerm}%`);
-            const numericFilters = numericColumns.map(col => `${col}::text.ilike.%${currentSearchTerm}%`);
-            
-            const orFilter = [...textFilters, ...numericFilters].join(',');
+            // Kita pakai DB_COLUMNS karena semua field yang akan dicari adalah TEXT
+            const orFilter = DB_COLUMNS.map(col => `${col}.ilike.%${currentSearchTerm}%`).join(',');
             query = query.or(orFilter);
         }
-
+        
         const { data, error } = await query;
-
         if (error) throw error;
-
+        
         if (data && data.length > 0) {
-            setupHeadersIfNeeded(data[0]);
+            setupHeadersIfNeeded();
             allData = allData.concat(data);
             filteredData = [...allData];
-            loadMoreData(); 
-
+            loadMoreData();
+            
             if (data.length < limit) hasMorePullData = false;
             else currentPullPage++;
         } else {
@@ -163,20 +166,17 @@ async function fetchPaginatedData() {
 }
 
 // --- FUNGSI PEMBANTU ---
-function setupHeadersIfNeeded(sampleRow) {
-    if (allData.length === 0) {
-        headers = Object.keys(sampleRow);
+function setupHeadersIfNeeded() {
+    if (headers.length === 0) {
+        headers = [...DB_COLUMNS];
         
         let headerHtml = '<tr><th class="col-id">No ID</th>';
         headers.forEach(function(header) {
-            headerHtml += `<th>${header}</th>`;
+            let headerTitle = header.replace(/_/g, ' ').toUpperCase();
+            headerHtml += `<th>${headerTitle}</th>`;
         });
         headerHtml += '</tr>';
         tableHead.innerHTML = headerHtml;
-    } else {
-        if (!headers.includes('keterangan')) {
-            headers.push('keterangan');
-        }
     }
 }
 
@@ -210,7 +210,7 @@ document.getElementById('fileUploadMain').addEventListener('change', function(e)
             row['keterangan'] = "Belum Selesai";
         });
 
-        setupHeadersIfNeeded(newData[0]);
+        setupHeadersIfNeeded();
 
         let uniqueMap = new Map();
         newData.forEach(item => {
@@ -267,7 +267,7 @@ document.getElementById('fileUploadDone').addEventListener('change', function(e)
             return lowerRow;
         });
 
-        setupHeadersIfNeeded(newData[0]);
+        setupHeadersIfNeeded();
 
         let uniqueMap = new Map();
         newData.forEach(item => {
