@@ -80,23 +80,71 @@ checkUser();
 
 // --- FUNGSI CRUD: UPLOAD/UPSERT ---
 async function sendToBackendInChunks(dataArray, chunkSize = 1000) {
+    if (!dataArray || dataArray.length === 0) return;
+
     let successCount = 0;
+    const maxConcurrent = 3; // Maksimal 3 request paralel
+    let promises = [];
     
-    for (let i = 0; i < dataArray.length; i += chunkSize) {
-        const chunk = dataArray.slice(i, i + chunkSize);
-        console.log(`Mengirim batch baris ${i + 1} hingga ${i + chunk.length}...`);
+    const totalChunks = Math.ceil(dataArray.length / chunkSize);
+    
+    // Tampilkan indikator progres di UI
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    loadingIndicator.style.display = "block";
+    loadingIndicator.innerText = `Mengunggah 0 / ${dataArray.length} baris ke server...`;
+    
+    // Kunci tombol input file agar user tidak melakukan aksi dobel
+    const uploadMain = document.getElementById('fileUploadMain');
+    const uploadDone = document.getElementById('fileUploadDone');
+    uploadMain.disabled = true;
+    uploadDone.disabled = true;
+
+    // Looping untuk memecah data dan mengirim secara paralel
+    for (let i = 0; i < totalChunks; i++) {
+        const from = i * chunkSize;
+        const chunk = dataArray.slice(from, from + chunkSize);
+        console.log(`Mengirim batch baris ${from + 1} hingga ${from + chunk.length}...`);
         
-        const { data, error } = await supabaseClient
+        // Buat Promise untuk dikirim ke Supabase tanpa langsung di-await
+        const requestPromise = supabaseClient
             .from(TABLE_NAME)
-            .upsert(chunk, { onConflict: 'kelurahan,nomor_hak,surat_ukur,nib,luas,produk,luas_peta,validator_tekstual,validator_peta,blokir_internal,kw,pemilik_pertama,pemilik_akhir,tipe_hak' });
-            
-        if (error) {
-            console.error(`Gagal pada batch:`, error.message);
-        } else {
-            successCount += chunk.length;
+            .upsert(chunk, { onConflict: 'kelurahan,nomor_hak,surat_ukur,nib,luas,produk,luas_peta,validator_tekstual,validator_peta,blokir_internal,kw,pemilik_pertama,pemilik_akhir,tipe_hak' })
+            .then(({ error }) => {
+                if (error) {
+                    console.error(`Gagal pada batch ${from + 1}:`, error.message);
+                } else {
+                    // Update jumlah sukses
+                    successCount += chunk.length;
+                }
+                // Update teks di layar untuk memberitahu user (Real-time Feedback)
+                loadingIndicator.innerText = `Mengunggah ${successCount} / ${dataArray.length} baris ke server...`;
+            });
+
+        promises.push(requestPromise);
+
+        // Jika jumlah request yang berjalan mencapai limit (3), tunggu ketiganya selesai dulu
+        if (promises.length >= maxConcurrent) {
+            await Promise.all(promises);
+            promises = []; // Kosongkan antrean, lanjut ke kelompok batch berikutnya
         }
     }
-    alert(`Selesai! Berhasil memproses ${successCount} dari ${dataArray.length} baris.`);
+
+    // Tunggu sisa request terakhir jika jumlah batch tidak genap kelipatan 3
+    if (promises.length > 0) {
+        await Promise.all(promises);
+    }
+
+    // Kembalikan UI ke kondisi semula
+    loadingIndicator.style.display = "none";
+    loadingIndicator.innerText = "Memuat data..."; // Kembalikan teks asli
+    uploadMain.disabled = false;
+    uploadDone.disabled = false;
+
+    // Tampilkan notifikasi hasil
+    alert(`Selesai! Berhasil menyimpan ${successCount} dari ${dataArray.length} baris ke database.`);
+    
+    // Perbarui jumlah data di antarmuka web
+    fetchServerCounts();
 }
 
 // --- FUNGSI CRUD: READ/COUNT ---
