@@ -455,7 +455,7 @@ async function fetchAllDataConcurrently() {
     return allFetchedData;
 }
 
-// --- BTN PRINT ---
+// --- BTN PRINT / EXPORT EXCEL ---
 document.getElementById('btnPrint').addEventListener('click', async function() {
     const btn = this;
     btn.disabled = true;
@@ -465,62 +465,33 @@ document.getElementById('btnPrint').addEventListener('click', async function() {
     const fullData = await fetchAllDataConcurrently();
     
     btn.disabled = false;
-    btn.innerText = "Print Seluruh Data";
+    btn.innerText = "Export ke Excel";
     
     if (fullData === null) return; // Error sudah di-handle di fungsi
     
     if (fullData.length === 0) {
-        alert("Tidak ada data untuk diprint.");
+        alert("Tidak ada data untuk diexport.");
         return;
     }
 
-    let printWindow = window.open('', '_blank');
-    
-    let htmlContent = `
-    <!DOCTYPE html>
-    <html lang="id">
-    <head>
-        <meta charset="UTF-8">
-        <title>Print Data EXCEL BOS EDS</title>
-        <style>
-            body { font-family: sans-serif; margin: 20px; }
-            table { border-collapse: collapse; width: 100%; font-size: 12px; }
-            th, td { border: 1px solid black; padding: 6px; text-align: left; }
-            th { background-color: #f2f2f2; }
-            .row-hijau { background-color: #ccffcc !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            h2 { text-align: center; }
-            @media print {
-                @page { margin: 1cm; }
-            }
-        </style>
-    </head>
-    <body>
-        <h2>Data EXCEL BOS EDS</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th style="width: 40px; text-align: center;">No</th>
-                    ${headers.map(h => `<th>${h.toUpperCase()}</th>`).join('')}
-                </tr>
-            </thead>
-            <tbody>
-                ${fullData.map((row, i) => {
-                    let isSelesai = row['keterangan'] && row['keterangan'].toLowerCase() === 'selesai';
-                    return `
-                    <tr class="${isSelesai ? 'row-hijau' : ''}">
-                        <td style="text-align: center;"><b>${i + 1}</b></td>${headers.map(h => `<td>${row[h] !== undefined ? row[h] : ''}</td>`).join('')}
-                    </tr>`;
-                }).join('')}
-            </tbody>
-        </table>
-        <script>
-            window.onload = function() {
-                window.print();
-            };
-        </script>
-    </body>
-    </html>`;
+    // 1. Menyusun ulang data agar rapi saat diubah ke Excel
+    let dataToExport = fullData.map((row, i) => {
+        let rowData = { "NO": i + 1 };
+        
+        headers.forEach(h => {
+            rowData[h.toUpperCase()] = row[h] !== undefined ? row[h] : '';
+        });
+        
+        return rowData;
+    });
 
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
+    // 2. Mengonversi data JSON ke bentuk Worksheet Excel
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+
+    // 3. Membuat Workbook baru dan memasukkan Worksheet ke dalamnya
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Data_Cimahi");
+
+    // 4. Memicu proses unduh file Excel
+    XLSX.writeFile(workbook, "Data_Kwalitas_Cimahi.xlsx");
 });
