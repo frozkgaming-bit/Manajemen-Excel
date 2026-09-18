@@ -164,11 +164,17 @@ async function fetchPaginatedData() {
         const from = (currentPullPage - 1) * limit;
         const to = from + limit - 1;
         
-        let query = supabaseClient.from(TABLE_NAME).select('*').order('id', { ascending: true }).range(from, to);
+        // Optimasi 1: Jangan gunakan select('*'). Spesifikasikan kolom untuk memangkas ukuran JSON.
+        const selectQuery = 'id,' + DB_COLUMNS.join(',');
         
-        // PENCARIAN BERDASARKAN SKEMA SQL TERBARU
+        let query = supabaseClient
+            .from(TABLE_NAME)
+            .select(selectQuery)
+            .order('id', { ascending: true })
+            .range(from, to);
+            
+        // Pencarian teks (tetap menggunakan skema Anda)
         if (currentSearchTerm !== "") {
-            // Kita pakai DB_COLUMNS karena semua field yang akan dicari adalah TEXT
             const orFilter = DB_COLUMNS.map(col => `${col}.ilike.%${currentSearchTerm}%`).join(',');
             query = query.or(orFilter);
         }
@@ -178,8 +184,18 @@ async function fetchPaginatedData() {
         
         if (data && data.length > 0) {
             setupHeadersIfNeeded();
-            allData = allData.concat(data);
-            filteredData = [...allData];
+            
+            // Optimasi 2: Langsung mutasi array alih-alih menyalin ulang seluruh array ribuan baris
+            allData.push(...data);
+            
+            // Karena ini dari server yang sudah difilter oleh 'query.or()', 
+            // filteredData bisa langsung di-assign referensinya atau ditambahkan langsung.
+            if (currentSearchTerm !== "") {
+                filteredData.push(...data);
+            } else {
+                filteredData = allData; // Hemat memori, gunakan referensi yang sama
+            }
+            
             loadMoreData();
             
             if (data.length < limit) hasMorePullData = false;
@@ -267,7 +283,7 @@ document.getElementById('fileUploadMain').addEventListener('change', function(e)
         loadMoreData();
         fetchServerCounts();
         
-        sendToBackendInChunks(cleanedNewData, 1000);
+        sendToBackendInChunks(cleanedNewData, 10000);
         
         e.target.value = ""; 
     };
@@ -347,7 +363,7 @@ document.getElementById('fileUploadDone').addEventListener('change', function(e)
         loadMoreData();
         fetchServerCounts();
         
-        sendToBackendInChunks(cleanedNewData, 1000);
+        sendToBackendInChunks(cleanedNewData, 10000);
         
         e.target.value = ""; 
     };
