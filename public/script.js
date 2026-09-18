@@ -394,10 +394,83 @@ document.getElementById('btnPullData').addEventListener('click', async function(
     await fetchPaginatedData();
 });
 
+// --- FETCH ALL DATA CONCURRENTLY (Untuk Print/Export) ---
+async function fetchAllDataConcurrently() {
+    const limit = 1000;
+    let allFetchedData = [];
+    
+    // 1. Ambil total data terlebih dahulu
+    const { count, error: countError } = await supabaseClient
+        .from(TABLE_NAME)
+        .select('*', { count: 'exact', head: true });
+        
+    if (countError) {
+        console.error("Gagal menghitung data", countError);
+        alert("Gagal menghitung total data: " + countError.message);
+        return null;
+    }
+
+    if (count === 0) {
+        return [];
+    }
+
+    // 2. Hitung berapa kali request (halaman) yang dibutuhkan
+    const totalPages = Math.ceil(count / limit);
+    const maxConcurrent = 3; // Maksimal 3 request paralel
+    let promises = [];
+
+    // 3. Looping untuk membuat antrean request
+    for (let page = 0; page < totalPages; page++) {
+        const from = page * limit;
+        const to = from + limit - 1;
+
+        console.log(`Menarik data baris ${from + 1} sampai ${to + 1}...`);
+        
+        // Buat promise fetch tanpa await langsung
+        const requestPromise = supabaseClient
+            .from(TABLE_NAME)
+            .select('*')
+            .range(from, to)
+            .then(({ data, error }) => {
+                if (error) throw error;
+                // Gabungkan data yang berhasil ditarik ke array utama
+                allFetchedData.push(...data);
+            });
+
+        promises.push(requestPromise);
+
+        // Jika jumlah antrean paralel sudah mencapai batas (3), tunggu sampai selesai
+        if (promises.length >= maxConcurrent) {
+            await Promise.all(promises);
+            promises = []; // Kosongkan antrean, lanjut ke batch berikutnya
+        }
+    }
+
+    // Tunggu sisa batch terakhir yang mungkin belum selesai
+    if (promises.length > 0) {
+        await Promise.all(promises);
+    }
+
+    console.log(`Selesai! Berhasil menarik ${allFetchedData.length} data.`);
+    return allFetchedData;
+}
+
 // --- BTN PRINT ---
-document.getElementById('btnPrint').addEventListener('click', function() {
-    if (allData.length === 0) {
-        alert("Tidak ada data untuk diprint. Silakan tarik atau upload data terlebih dahulu.");
+document.getElementById('btnPrint').addEventListener('click', async function() {
+    const btn = this;
+    btn.disabled = true;
+    btn.innerText = "Mengambil semua data...";
+    
+    // Ambil SEMUA data dari Supabase (concurrent chunking)
+    const fullData = await fetchAllDataConcurrently();
+    
+    btn.disabled = false;
+    btn.innerText = "Print Seluruh Data";
+    
+    if (fullData === null) return; // Error sudah di-handle di fungsi
+    
+    if (fullData.length === 0) {
+        alert("Tidak ada data untuk diprint.");
         return;
     }
 
@@ -431,7 +504,7 @@ document.getElementById('btnPrint').addEventListener('click', function() {
                 </tr>
             </thead>
             <tbody>
-                ${allData.map((row, i) => {
+                ${fullData.map((row, i) => {
                     let isSelesai = row['keterangan'] && row['keterangan'].toLowerCase() === 'selesai';
                     return `
                     <tr class="${isSelesai ? 'row-hijau' : ''}">
