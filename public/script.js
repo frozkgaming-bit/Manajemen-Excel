@@ -458,40 +458,60 @@ async function fetchAllDataConcurrently() {
 // --- BTN PRINT / EXPORT EXCEL ---
 document.getElementById('btnPrint').addEventListener('click', async function() {
     const btn = this;
+    const originalText = btn.innerText;
+    
+    // Ubah teks tombol saat loading
+    btn.innerText = "Mengekspor... Mohon tunggu";
     btn.disabled = true;
-    btn.innerText = "Mengambil semua data...";
-    
-    // Ambil SEMUA data dari Supabase (concurrent chunking)
-    const fullData = await fetchAllDataConcurrently();
-    
-    btn.disabled = false;
-    btn.innerText = "Export ke Excel";
-    
-    if (fullData === null) return; // Error sudah di-handle di fungsi
-    
-    if (fullData.length === 0) {
-        alert("Tidak ada data untuk diexport.");
-        return;
-    }
 
-    // 1. Menyusun ulang data agar rapi saat diubah ke Excel
-    let dataToExport = fullData.map((row, i) => {
-        let rowData = { "NO": i + 1 };
-        
-        headers.forEach(h => {
-            rowData[h.toUpperCase()] = row[h] !== undefined ? row[h] : '';
+    try {
+        // 1. Tarik SELURUH data dari server menggunakan fungsi bawaan Anda
+        const allExportData = await fetchAllDataConcurrently();
+
+        if (!allExportData || allExportData.length === 0) {
+            alert("Tidak ada data untuk diexport di database.");
+            return;
+        }
+
+        // Pastikan DB_COLUMNS sudah ada (jika belum, kita deklarasikan ulang di dalam sini sebagai safety)
+        const columns = [
+            'kelurahan', 'nomor_hak', 'surat_ukur', 'nib', 'luas', 
+            'produk', 'luas_peta', 'validator_tekstual', 'validator_peta', 
+            'blokir_internal', 'kw', 'pemilik_pertama', 'pemilik_akhir', 
+            'tipe_hak', 'keterangan'
+        ];
+
+        // 2. Menyusun ulang data agar rapi saat diubah ke Excel
+        let dataToExport = allExportData.map((row, i) => {
+            let rowData = { "NO": i + 1 }; // Tambah nomor urut di awal
+            
+            columns.forEach(h => {
+                // Rapikan nama kolom (misal: "nomor_hak" -> "NOMOR HAK")
+                let headerTitle = h.replace(/_/g, ' ').toUpperCase(); 
+                
+                // Masukkan data, jika null/undefined jadikan string kosong
+                rowData[headerTitle] = row[h] !== undefined && row[h] !== null ? row[h] : '';
+            });
+            
+            return rowData;
         });
-        
-        return rowData;
-    });
 
-    // 2. Mengonversi data JSON ke bentuk Worksheet Excel
-    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+        // 3. Mengonversi data JSON ke bentuk Worksheet Excel
+        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
 
-    // 3. Membuat Workbook baru dan memasukkan Worksheet ke dalamnya
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Data_Cimahi");
+        // 4. Membuat Workbook baru dan memasukkan Worksheet ke dalamnya
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Data_Cimahi");
 
-    // 4. Memicu proses unduh file Excel
-    XLSX.writeFile(workbook, "Data_Kwalitas_Cimahi.xlsx");
+        // 5. Memicu proses unduh file Excel
+        XLSX.writeFile(workbook, "Data_Kwalitas_Cimahi.xlsx");
+
+    } catch (error) {
+        console.error("Gagal mengekspor data:", error);
+        alert("Terjadi kesalahan saat mengekspor data.");
+    } finally {
+        // Kembalikan tombol ke keadaan semula
+        btn.innerText = originalText;
+        btn.disabled = false;
+    }
 });
