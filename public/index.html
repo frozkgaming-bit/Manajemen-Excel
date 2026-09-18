@@ -5,47 +5,70 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Olah Data EXCEL BOS EDS</title>
     <link rel="stylesheet" href="style.css">
+    <!-- Tambahkan library Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
+    <!-- BAGIAN LOGIN -->
+    <div id="loginSection" style="max-width: 300px; margin: 50px auto; padding: 20px; border: 1px solid #ccc; border-radius: 5px;">
+        <h2>Login Sistem</h2>
+        <div style="margin-bottom: 10px;">
+            <label for="loginUsername">Username:</label><br>
+            <input type="text" id="loginUsername" style="width: 100%; padding: 5px;" placeholder="Masukkan username...">
+        </div>
+        <div style="margin-bottom: 15px;">
+            <label for="loginPassword">Password:</label><br>
+            <input type="password" id="loginPassword" style="width: 100%; padding: 5px;">
+        </div>
+        <button id="btnLogin" style="width: 100%; padding: 8px; background-color: #007bff; color: white; border: none; cursor: pointer;">Login</button>
+        <div id="loginError" style="color: red; margin-top: 10px; font-size: 12px; display: none;"></div>
+    </div>
 
-    <h2>Data EXCEL BOS EDS</h2>
-    
-    <div id="controls">
-        <div class="upload-group">
-            <label>Upload Basis Data Utama:</label>
-            <input type="file" id="fileUploadMain" accept=".xlsx, .xls, .csv" />
-        </div>
-        <div class="upload-group" style="margin-top: 10px;">
-            <label>Upload Data Selesai (Otomatis "Selesai"):</label>
-            <input type="file" id="fileUploadDone" accept=".xlsx, .xls, .csv" />
-        </div>
-        <div class="upload-group" style="margin-top: 10px;">
-            <button id="btnPullData" style="padding: 8px 15px; cursor: pointer; background-color: #007bff; color: white; border: none; border-radius: 4px;">
-                Tarik Seluruh Data dari Supabase
-            </button>
-            <button id="btnPrint" style="padding: 8px 15px; cursor: pointer; background-color: #28a745; color: white; border: none; border-radius: 4px; margin-left: 10px;">
-                Print Seluruh Data
-            </button>
+    <!-- BAGIAN APLIKASI UTAMA (Disembunyikan pada awalnya) -->
+    <div id="appSection" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2>Data EXCEL BOS EDS</h2>
+            <button id="btnLogout" style="padding: 5px 10px; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">Logout</button>
         </div>
         
-        <input type="text" id="searchInput" placeholder="Cari data..." autocomplete="off" style="margin-top: 15px;">
-        <div id="dataSummary" style="margin-top: 15px; padding: 10px; background-color: #e9ecef; border-radius: 5px; font-weight: bold; border: 1px solid #ccc;">
-            📊 Total Data: <span id="countTotal" style="color: blue;">0</span> | 
-            ✅ Selesai: <span id="countSelesai" style="color: green;">0</span> | 
-            ⏳ Belum Selesai: <span id="countBelum" style="color: red;">0</span>
-            <span id="filterSummary" style="display: none; margin-left: 10px; padding-left: 10px; border-left: 2px solid #aaa;">
-                🔍 Ditemukan: <span id="countFiltered" style="color: #d35400;">0</span>
-            </span>
+        <div id="controls">
+            <!-- (Isi kontrol sama seperti kode asli Anda: fileUploadMain, fileUploadDone, btnPullData, dll) -->
+            <div class="upload-group">
+                <label for="fileUploadMain">Upload Basis Data Utama:</label>
+                <input type="file" id="fileUploadMain" accept=".xlsx, .xls, .csv" />
+            </div>
+            <div class="upload-group" style="margin-top: 10px;">
+                <label for="fileUploadDone">Upload Data Selesai (Otomatis "Selesai"):</label>
+                <input type="file" id="fileUploadDone" accept=".xlsx, .xls, .csv" />
+            </div>
+            <div class="upload-group" style="margin-top: 10px;">
+                <button id="btnPullData" style="padding: 8px 15px; cursor: pointer; background-color: #007bff; color: white; border: none; border-radius: 4px;">
+                    Tarik Seluruh Data dari Supabase
+                </button>
+                <button id="btnPrint" style="padding: 8px 15px; cursor: pointer; background-color: #28a745; color: white; border: none; border-radius: 4px; margin-left: 10px;">
+                    Print Seluruh Data
+                </button>
+            </div>
+            
+            <input type="text" id="searchInput" placeholder="Cari data..." autocomplete="off" style="margin-top: 15px;">
+            <div id="dataSummary" style="margin-top: 15px; padding: 10px; background-color: #e9ecef; border-radius: 5px; font-weight: bold; border: 1px solid #ccc;">
+                  Total Data: <span id="countTotal" style="color: blue;">0</span> | 
+                  Selesai: <span id="countSelesai" style="color: green;">0</span> | 
+                  Belum Selesai: <span id="countBelum" style="color: red;">0</span>
+                <span id="filterSummary" style="display: none; margin-left: 10px; padding-left: 10px; border-left: 2px solid #aaa;">
+                      Ditemukan: <span id="countFiltered" style="color: #d35400;">0</span>
+                </span>
+            </div>
         </div>
-    </div>
-    
-    <div id="tableScrollWrapper">
-        <table id="dataTable">
-            <thead id="tableHead"></thead>
-            <tbody id="tableBody"></tbody>
-        </table>
-        <div id="loadingIndicator">Memuat data...</div>
+        
+        <div id="tableScrollWrapper">
+            <table id="dataTable">
+                <thead id="tableHead"></thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+            <div id="loadingIndicator">Memuat data...</div>
+        </div>
     </div>
 
     <script src="script.js"></script>

@@ -1,71 +1,171 @@
-async function sendToBackendInChunks(endpoint, dataArray, chunkSize = 1000) {
-    let successCount = 0;
-    const maxConcurrent = 5; // Kirim 3 batch secara bersamaan (paralel)
-    let promises = [];
+// --- KONFIGURASI SUPABASE ---
+const SUPABASE_URL = 'https://pmoqzheinikyddkehbhd.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_3eeK9jTStOQM3JM3VP-VkA_swV4V3_b';
+const TABLE_NAME = 'kwalitas_data_cimahi';
 
-    for (let i = 0; i < dataArray.length; i += chunkSize) {
-        const chunk = dataArray.slice(i, i + chunkSize);
-        
-        console.log(`Menyiapkan batch baris ${i + 1} hingga ${i + chunk.length}...`);
-        
-        // Buat promise fetch tanpa await langsung
-        const requestPromise = fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ dataList: chunk })
-        })
-        .then(async (response) => {
-            const result = await response.json();
-            if (!result.success) {
-                console.error(`Gagal pada batch: ${result.error}`);
-            } else {
-                successCount += chunk.length;
-            }
-        })
-        .catch(err => {
-            console.error(`Koneksi terputus saat mengirim batch:`, err);
-        });
+// UBAH: Gunakan nama variabel 'supabaseClient' untuk menghindari bentrok dengan global 'supabase'
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        promises.push(requestPromise);
-
-        // Jika jumlah request paralel sudah mencapai batas, tunggu sampai selesai
-        if (promises.length >= maxConcurrent) {
-            await Promise.all(promises);
-            promises = []; // Kosongkan antrean
-        }
-    }
-    
-    // Tunggu sisa batch yang mungkin belum selesai
-    if (promises.length > 0) {
-        await Promise.all(promises);
-    }
-    
-    alert(`Selesai! Berhasil memproses ${successCount} dari ${dataArray.length} baris.`);
-}
-
-let allData = []; 
-let filteredData = []; 
-let headers = []; 
-let currentIndex = 0; 
-const batchSize = 50; 
-
-// Pagination state untuk pull data
-let currentPullPage = 1;
-let isPulling = false;
-let hasMorePullData = true; 
-let currentSearchTerm = "";
-let searchTimeout = null; 
-
+// --- ELEMEN DOM ---
+const loginSection = document.getElementById('loginSection');
+const appSection = document.getElementById('appSection');
+const btnLogin = document.getElementById('btnLogin');
+const btnLogout = document.getElementById('btnLogout');
+const loginError = document.getElementById('loginError');
 const tableBody = document.getElementById('tableBody');
 const tableHead = document.getElementById('tableHead');
 const scrollWrapper = document.getElementById('tableScrollWrapper');
 const loadingIndicator = document.getElementById('loadingIndicator');
 const searchInput = document.getElementById('searchInput');
 
-// Fungsi pembantu untuk merender header tabel
+// Variabel Data
+let allData = [];
+let filteredData = [];
+let headers = [];
+let currentIndex = 0;
+const batchSize = 50;
+let currentPullPage = 1;
+let isPulling = false;
+let hasMorePullData = true;
+let currentSearchTerm = "";
+let searchTimeout = null;
+
+// --- AUTENTIKASI ---
+async function checkUser() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (session) {
+        loginSection.style.display = 'none';
+        appSection.style.display = 'block';
+        fetchServerCounts();
+    } else {
+        loginSection.style.display = 'block';
+        appSection.style.display = 'none';
+    }
+}
+
+btnLogin.addEventListener('click', async () => {
+    const usernameInput = document.getElementById('loginUsername').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    
+    const email = `${usernameInput}@admin.sistem`;
+    
+    loginError.style.display = 'none';
+    btnLogin.innerText = "Loading...";
+    
+    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    
+    btnLogin.innerText = "Login";
+    if (error) {
+        loginError.innerText = "Error Supabase: " + error.message;
+        loginError.style.display = 'block';
+    } else {
+        checkUser();
+    }
+});
+
+btnLogout.addEventListener('click', async () => {
+    await supabaseClient.auth.signOut();
+    checkUser();
+});
+
+checkUser();
+
+// --- FUNGSI CRUD: UPLOAD/UPSERT ---
+async function sendToBackendInChunks(dataArray, chunkSize = 1000) {
+    let successCount = 0;
+    
+    for (let i = 0; i < dataArray.length; i += chunkSize) {
+        const chunk = dataArray.slice(i, i + chunkSize);
+        console.log(`Mengirim batch baris ${i + 1} hingga ${i + chunk.length}...`);
+        
+        const { data, error } = await supabaseClient
+            .from(TABLE_NAME)
+            .upsert(chunk, { onConflict: 'kelurahan,nomor_hak,surat_ukur,nib,luas,produk,luas_peta,validator_tekstual,validator_peta,blokir_internal,kw,pemilik_pertama,pemilik_akhir,tipe_hak' });
+            
+        if (error) {
+            console.error(`Gagal pada batch:`, error.message);
+        } else {
+            successCount += chunk.length;
+        }
+    }
+    alert(`Selesai! Berhasil memproses ${successCount} dari ${dataArray.length} baris.`);
+}
+
+// --- FUNGSI CRUD: READ/COUNT ---
+async function fetchServerCounts() {
+    try {
+        const { count: total, error: errTotal } = await supabaseClient
+            .from(TABLE_NAME).select('*', { count: 'exact', head: true });
+            
+        const { count: selesai, error: errSelesai } = await supabaseClient
+            .from(TABLE_NAME).select('*', { count: 'exact', head: true })
+            .eq('keterangan', 'Selesai');
+            
+        if (errTotal || errSelesai) throw errTotal || errSelesai;
+
+        document.getElementById('countTotal').innerText = total || 0;
+        document.getElementById('countSelesai').innerText = selesai || 0;
+        document.getElementById('countBelum').innerText = (total - selesai) || 0;
+    } catch (error) {
+        console.error("Gagal mengambil jumlah data:", error);
+    }
+}
+
+async function fetchPaginatedData() {
+    if (isPulling || !hasMorePullData) return;
+    
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    isPulling = true;
+    loadingIndicator.style.display = "block";
+    
+    try {
+        const limit = 50;
+        const from = (currentPullPage - 1) * limit;
+        const to = from + limit - 1;
+
+        let query = supabaseClient.from(TABLE_NAME).select('*').range(from, to);
+
+        if (currentSearchTerm !== "") {
+            const textColumns = ['kelurahan','surat_ukur','produk','validator_tekstual','validator_peta','blokir_internal','pemilik_pertama','pemilik_akhir','tipe_hak','keterangan'];
+            const numericColumns = ['nomor_hak','nib','luas','luas_peta','kw'];
+
+            const textFilters = textColumns.map(col => `${col}.ilike.%${currentSearchTerm}%`);
+            const numericFilters = numericColumns.map(col => `${col}::text.ilike.%${currentSearchTerm}%`);
+            
+            const orFilter = [...textFilters, ...numericFilters].join(',');
+            query = query.or(orFilter);
+        }
+
+        const { data, error } = await query;
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+            setupHeadersIfNeeded(data[0]);
+            allData = allData.concat(data);
+            filteredData = [...allData];
+            loadMoreData(); 
+
+            if (data.length < limit) hasMorePullData = false;
+            else currentPullPage++;
+        } else {
+            hasMorePullData = false;
+            if (currentPullPage === 1) {
+                document.getElementById('tableBody').innerHTML = "<tr><td colspan='100%' style='text-align:center;'>Data tidak ditemukan</td></tr>";
+            }
+        }
+    } catch (error) {
+        console.error("Error fetching data:", error);
+    } finally {
+        isPulling = false;
+        loadingIndicator.style.display = "none";
+    }
+}
+
+// --- FUNGSI PEMBANTU ---
 function setupHeadersIfNeeded(sampleRow) {
     if (allData.length === 0) {
-        headers = Object.keys(sampleRow); // Mengambil nama kolom yang sudah di-lowercase[cite: 1]
+        headers = Object.keys(sampleRow);
         
         let headerHtml = '<tr><th class="col-id">No ID</th>';
         headers.forEach(function(header) {
@@ -80,19 +180,17 @@ function setupHeadersIfNeeded(sampleRow) {
     }
 }
 
-// 1. Event listener untuk Basis Data Utama
+// --- EVENT LISTENER UPLOAD BASIS DATA UTAMA ---
 document.getElementById('fileUploadMain').addEventListener('change', function(e) {
     var file = e.target.files[0];
     if (!file) return;
     
     var reader = new FileReader();
-
     reader.onload = function(e) {
         var data = new Uint8Array(e.target.result);
         var workbook = XLSX.read(data, {type: 'array'});
         var firstSheetName = workbook.SheetNames[0];
         var worksheet = workbook.Sheets[firstSheetName];
-
         var rawData = XLSX.utils.sheet_to_json(worksheet, {defval: ""});
 
         if(rawData.length === 0) {
@@ -100,7 +198,6 @@ document.getElementById('fileUploadMain').addEventListener('change', function(e)
             return;
         }
 
-        // MENGUBAH SEMUA HEADER MENJADI LOWERCASE
         var newData = rawData.map(function(row) {
             var lowerRow = {};
             for (var key in row) {
@@ -115,23 +212,18 @@ document.getElementById('fileUploadMain').addEventListener('change', function(e)
 
         setupHeadersIfNeeded(newData[0]);
 
-        // --- TAMBAHAN: HAPUS DUPLIKAT INTERNAL DALAM 1 FILE EXCEL ---
         let uniqueMap = new Map();
         newData.forEach(item => {
             item['keterangan'] = "Belum Selesai";
-            // Buat signature unik berdasarkan seluruh kolom (kecuali keterangan)
             let signature = headers
                 .filter(header => header !== 'keterangan')
                 .map(header => (item[header] !== undefined && item[header] !== null ? item[header].toString().trim() : ''))
                 .join('__');
             
-            // Hanya ambil baris terakhir/unik jika ada yang kembar di file yang sama
             uniqueMap.set(signature, item);
         });
         
         let cleanedNewData = Array.from(uniqueMap.values());
-        // ------------------------------------------------------------
-
         allData = allData.concat(cleanedNewData);
         
         searchInput.value = ""; 
@@ -142,29 +234,24 @@ document.getElementById('fileUploadMain').addEventListener('change', function(e)
         loadMoreData();
         fetchServerCounts();
         
-        // --- TAMBAHKAN BARIS INI UNTUK MENGIRIM KE SUPABASE ---
-        sendToBackendInChunks('/api/upload-main', cleanedNewData, 1000);
-        // ------------------------------------------------------
+        sendToBackendInChunks(cleanedNewData, 1000);
         
         e.target.value = ""; 
     };
-
     reader.readAsArrayBuffer(file);
 });
 
-// 2. Event listener untuk Data Selesai (Upsert Sensitif)
+// --- EVENT LISTENER UPLOAD DATA SELESAI ---
 document.getElementById('fileUploadDone').addEventListener('change', function(e) {
     var file = e.target.files[0];
     if (!file) return;
     
     var reader = new FileReader();
-
     reader.onload = function(e) {
         var data = new Uint8Array(e.target.result);
         var workbook = XLSX.read(data, {type: 'array'});
         var firstSheetName = workbook.SheetNames[0];
         var worksheet = workbook.Sheets[firstSheetName];
-
         var rawData = XLSX.utils.sheet_to_json(worksheet, {defval: ""});
 
         if(rawData.length === 0) {
@@ -172,7 +259,6 @@ document.getElementById('fileUploadDone').addEventListener('change', function(e)
             return;
         }
 
-        // MENGUBAH SEMUA HEADER MENJADI LOWERCASE
         var newData = rawData.map(function(row) {
             var lowerRow = {};
             for (var key in row) {
@@ -183,24 +269,20 @@ document.getElementById('fileUploadDone').addEventListener('change', function(e)
 
         setupHeadersIfNeeded(newData[0]);
 
-        // --- TAMBAHAN: HAPUS DUPLIKAT INTERNAL DALAM 1 FILE EXCEL ---
         let uniqueMap = new Map();
         newData.forEach(item => {
             item['keterangan'] = "Selesai";
-            // Buat signature unik berdasarkan seluruh kolom (kecuali keterangan)
             let signature = headers
                 .filter(header => header !== 'keterangan')
                 .map(header => (item[header] !== undefined && item[header] !== null ? item[header].toString().trim() : ''))
                 .join('__');
             
-            // Hanya ambil baris terakhir/unik jika ada yang kembar di file yang sama
             uniqueMap.set(signature, item);
         });
         
         let cleanedNewData = Array.from(uniqueMap.values());
-        // ------------------------------------------------------------
-
         let mapIndex = new Map();
+
         allData.forEach((item, idx) => {
             let signature = headers
                 .filter(header => header !== 'keterangan')
@@ -232,16 +314,14 @@ document.getElementById('fileUploadDone').addEventListener('change', function(e)
         loadMoreData();
         fetchServerCounts();
         
-        // --- TAMBAHKAN BARIS INI UNTUK MENGIRIM KE SUPABASE ---
-        sendToBackendInChunks('/api/upload-done', cleanedNewData, 1000);
-        // ------------------------------------------------------
+        sendToBackendInChunks(cleanedNewData, 1000);
         
         e.target.value = ""; 
     };
-
     reader.readAsArrayBuffer(file);
 });
 
+// --- EVENT LISTENER SEARCH ---
 searchInput.addEventListener('input', function(e) {
     currentSearchTerm = e.target.value.trim();
     
@@ -250,17 +330,15 @@ searchInput.addEventListener('input', function(e) {
         currentPullPage = 1;
         hasMorePullData = true;
         allData = []; 
-        filteredData = [];
-        currentIndex = 0;
         document.getElementById('tableBody').innerHTML = "";
         
         fetchPaginatedData();
     }, 500);
 });
 
+// --- LOAD MORE DATA ---
 function loadMoreData() {
     if (currentIndex >= filteredData.length) return;
-
     loadingIndicator.style.display = "block";
 
     let endIndex = currentIndex + batchSize;
@@ -269,17 +347,16 @@ function loadMoreData() {
     }
 
     let rowsHtml = "";
-
     for (let i = currentIndex; i < endIndex; i++) {
         let row = filteredData[i];
-        let rowClass = ""; 
+        let rowClass = "";
 
         if (row['keterangan'] && row['keterangan'].toLowerCase() === 'selesai') {
             rowClass = "row-hijau"; 
         }
         
         rowsHtml += `<tr class="${rowClass}">`;
-        rowsHtml += `<td class="col-id" style="text-align: center;"><b>${i + 1}</b></td>`; 
+        rowsHtml += `<td class="col-id" style="text-align: center;"><b>${i + 1}</b></td>`;
         
         headers.forEach(function(header) {
             rowsHtml += `<td>${row[header] !== undefined ? row[header] : ''}</td>`;
@@ -293,13 +370,7 @@ function loadMoreData() {
     loadingIndicator.style.display = "none";
 }
 
-// Fungsi untuk memperbarui tampilan jumlah data
-// Ponytail: Fungsi ini dihentikan karena perhitungan beralih ke server-side.
-// Gunakan fetchServerCounts() untuk sinkronisasi dengan database.
-function updateDataCount() {
-    return;
-}
-
+// --- SCROLL LISTENER ---
 scrollWrapper.addEventListener('scroll', function() {
     if (scrollWrapper.scrollTop + scrollWrapper.clientHeight >= scrollWrapper.scrollHeight - 5) {
         if (currentIndex < filteredData.length) {
@@ -310,121 +381,28 @@ scrollWrapper.addEventListener('scroll', function() {
     }
 });
 
-// 1. Fungsi untuk menarik perhitungan global dari server
-async function fetchServerCounts() {
-    try {
-        const response = await fetch('/api/get-counts');
-        const result = await response.json();
-
-        if (result.success) {
-            document.getElementById('countTotal').innerText = result.total;
-            document.getElementById('countSelesai').innerText = result.selesai;
-            document.getElementById('countBelum').innerText = result.belum;
-        }
-    } catch (error) {
-        console.error("Gagal mengambil jumlah data dari server:", error);
-    }
-}
-
+// --- BTN PULL DATA ---
 document.getElementById('btnPullData').addEventListener('click', async function() {
     currentPullPage = 1;
     hasMorePullData = true;
     allData = []; 
     document.getElementById('tableBody').innerHTML = "";
-    document.getElementById('searchInput').value = ""; // Reset input pencarian
+    document.getElementById('searchInput').value = ""; 
     currentSearchTerm = "";
     
-    // Perbarui total data dari database
     fetchServerCounts();
-    // Mulai tarik data ke tabel
     await fetchPaginatedData();
 });
 
-// 3. Event Listener untuk Input Pencarian (Hanya memengaruhi tabel & "Ditemukan")
-document.getElementById('searchInput').addEventListener('input', function(e) {
-    currentSearchTerm = e.target.value.trim();
-    
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => {
-        currentPullPage = 1;
-        hasMorePullData = true;
-        allData = []; 
-        document.getElementById('tableBody').innerHTML = "";
-        
-        fetchPaginatedData();
-    }, 500);
-});
-
-// 4. Fungsi untuk menarik data tabel (beserta pagination & search)
-async function fetchPaginatedData() {
-    if (isPulling || !hasMorePullData) return;
-    
-    const loadingIndicator = document.getElementById('loadingIndicator');
-    isPulling = true;
-    loadingIndicator.style.display = "block";
-
-    try {
-        const url = `/api/pull-data?page=${currentPullPage}&limit=50&search=${encodeURIComponent(currentSearchTerm)}`;
-        const response = await fetch(url);
-        const result = await response.json();
-
-        if (result.success && result.data.length > 0) {
-            let fetchedData = result.data.map(row => {
-                let lowerRow = {};
-                for (let key in row) lowerRow[key.toLowerCase()] = row[key];
-                return lowerRow;
-            });
-
-            setupHeadersIfNeeded(fetchedData[0]);
-            allData = allData.concat(fetchedData);
-            filteredData = [...allData];
-            
-            loadMoreData(); 
-
-            // HANYA UPDATE ANGKA "DITEMUKAN" SAAT MENCARI
-            const filterSummary = document.getElementById('filterSummary');
-            if (currentSearchTerm !== "") {
-                filterSummary.style.display = "inline-block";
-                document.getElementById('countFiltered').innerText = result.count; 
-            } else {
-                filterSummary.style.display = "none";
-            }
-            
-            if (result.data.length < result.limit) {
-                hasMorePullData = false;
-            } else {
-                currentPullPage++;
-            }
-        } else {
-            hasMorePullData = false;
-            if (currentPullPage === 1) {
-                document.getElementById('tableBody').innerHTML = "<tr><td colspan='100%' style='text-align:center;'>Data tidak ditemukan</td></tr>";
-                
-                if (currentSearchTerm !== "") {
-                    document.getElementById('filterSummary').style.display = "inline-block";
-                    document.getElementById('countFiltered').innerText = 0;
-                }
-            }
-        }
-    } catch (error) {
-        console.error("Error fetching data:", error);
-    } finally {
-        isPulling = false;
-        loadingIndicator.style.display = "none";
-    }
-}
-
-// Event listener untuk tombol Print Seluruh Data
+// --- BTN PRINT ---
 document.getElementById('btnPrint').addEventListener('click', function() {
     if (allData.length === 0) {
         alert("Tidak ada data untuk diprint. Silakan tarik atau upload data terlebih dahulu.");
         return;
     }
 
-    // Membuka jendela baru untuk tampilan print
     let printWindow = window.open('', '_blank');
     
-    // Menyusun isi HTML dan tabel
     let htmlContent = `
     <!DOCTYPE html>
     <html lang="id">
@@ -436,7 +414,6 @@ document.getElementById('btnPrint').addEventListener('click', function() {
             table { border-collapse: collapse; width: 100%; font-size: 12px; }
             th, td { border: 1px solid black; padding: 6px; text-align: left; }
             th { background-color: #f2f2f2; }
-            /* Memastikan background hijau tercetak */
             .row-hijau { background-color: #ccffcc !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             h2 { text-align: center; }
             @media print {
@@ -458,22 +435,19 @@ document.getElementById('btnPrint').addEventListener('click', function() {
                     let isSelesai = row['keterangan'] && row['keterangan'].toLowerCase() === 'selesai';
                     return `
                     <tr class="${isSelesai ? 'row-hijau' : ''}">
-                        <td style="text-align: center;"><b>${i + 1}</b></td>
-                        ${headers.map(h => `<td>${row[h] !== undefined ? row[h] : ''}</td>`).join('')}
+                        <td style="text-align: center;"><b>${i + 1}</b></td>${headers.map(h => `<td>${row[h] !== undefined ? row[h] : ''}</td>`).join('')}
                     </tr>`;
                 }).join('')}
             </tbody>
         </table>
         <script>
-            // Jalankan print dialog setelah data dimuat
             window.onload = function() {
                 window.print();
             };
         </script>
     </body>
-    </html>\`;
+    </html>`;
 
-    // Menuliskan konten ke jendela print
     printWindow.document.write(htmlContent);
     printWindow.document.close();
 });
