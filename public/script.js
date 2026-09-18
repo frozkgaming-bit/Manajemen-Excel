@@ -131,7 +131,7 @@ async function fetchPaginatedData() {
         const from = (currentPullPage - 1) * limit;
         const to = from + limit - 1;
         
-        let query = supabaseClient.from(TABLE_NAME).select('*').range(from, to);
+        let query = supabaseClient.from(TABLE_NAME).select('*').order('id', { ascending: true }).range(from, to);
         
         // PENCARIAN BERDASARKAN SKEMA SQL TERBARU
         if (currentSearchTerm !== "") {
@@ -395,6 +395,7 @@ document.getElementById('btnPullData').addEventListener('click', async function(
 });
 
 // --- FETCH ALL DATA CONCURRENTLY (Untuk Print/Export) ---
+// --- FETCH ALL DATA CONCURRENTLY (Untuk Print/Export) ---
 async function fetchAllDataConcurrently() {
     const limit = 1000;
     let allFetchedData = [];
@@ -409,7 +410,6 @@ async function fetchAllDataConcurrently() {
         alert("Gagal menghitung total data: " + countError.message);
         return null;
     }
-
     if (count === 0) {
         return [];
     }
@@ -418,40 +418,50 @@ async function fetchAllDataConcurrently() {
     const totalPages = Math.ceil(count / limit);
     const maxConcurrent = 3; // Maksimal 3 request paralel
     let promises = [];
+    
+    // Array penampung agar urutan data halaman tidak acak meski prosesnya paralel
+    let pagedData = new Array(totalPages);
 
     // 3. Looping untuk membuat antrean request
     for (let page = 0; page < totalPages; page++) {
         const from = page * limit;
         const to = from + limit - 1;
-
         console.log(`Menarik data baris ${from + 1} sampai ${to + 1}...`);
         
-        // Buat promise fetch tanpa await langsung
+        // PENTING: Wajib pakai .order('id') agar database tidak mengacak paginasi
         const requestPromise = supabaseClient
             .from(TABLE_NAME)
             .select('*')
+            .order('id', { ascending: true }) 
             .range(from, to)
             .then(({ data, error }) => {
                 if (error) throw error;
-                // Gabungkan data yang berhasil ditarik ke array utama
-                allFetchedData.push(...data);
+                // Simpan di indeks spesifik agar urutannya mengunci
+                pagedData[page] = data; 
             });
-
+            
         promises.push(requestPromise);
 
-        // Jika jumlah antrean paralel sudah mencapai batas (3), tunggu sampai selesai
+        // Jika antrean paralel sudah penuh (3), tunggu sampai selesai
         if (promises.length >= maxConcurrent) {
             await Promise.all(promises);
-            promises = []; // Kosongkan antrean, lanjut ke batch berikutnya
+            promises = []; 
         }
     }
-
-    // Tunggu sisa batch terakhir yang mungkin belum selesai
+    
+    // Tunggu sisa batch terakhir
     if (promises.length > 0) {
         await Promise.all(promises);
     }
 
-    console.log(`Selesai! Berhasil menarik ${allFetchedData.length} data.`);
+    // 4. Gabungkan (flatten) array hasil paginasi secara urut (Hal 1 -> Hal 2 -> Hal 3)
+    for (let i = 0; i < totalPages; i++) {
+        if (pagedData[i]) {
+            allFetchedData.push(...pagedData[i]);
+        }
+    }
+    
+    console.log(`Selesai! Berhasil menarik ${allFetchedData.length} data aktual sesuai urutan.`);
     return allFetchedData;
 }
 
