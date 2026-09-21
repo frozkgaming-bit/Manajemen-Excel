@@ -51,7 +51,13 @@
             </button>
             </div>
             
-            <input type="text" id="searchInput" placeholder="Cari data..." autocomplete="off" style="margin-top: 15px;">
+            <div style="margin-top: 15px; display: flex; gap: 10px; align-items: center;">
+            <select id="searchCategory" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+                <option value="all">Semua Kategori</option>
+                <!-- Opsi kategori akan di-generate otomatis oleh script.js -->
+            </select>
+            <input type="text" id="searchInput" placeholder="Cari data..." autocomplete="off" style="flex-grow: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+        </div>
             <div id="dataSummary" style="margin-top: 15px; padding: 10px; background-color: #e9ecef; border-radius: 5px; font-weight: bold; border: 1px solid #ccc;">
                   Total Data: <span id="countTotal" style="color: blue;">0</span> | 
                   Selesai: <span id="countSelesai" style="color: green;">0</span> | 
@@ -71,6 +77,6 @@
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <script type="module" src="js/main.js"></script>
 </body>
 </html>
