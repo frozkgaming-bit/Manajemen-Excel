@@ -1,12 +1,8 @@
 {
-  "version": 2,
-  "buildCommand": "xcopy /E /I /Y public .",
-  "outputDirectory": ".",
-  "framework": null,
   "rewrites": [
     {
       "source": "/(.*)",
-      "destination": "/index.html"
+      "destination": "/public/index.html"
     }
   ]
 }
