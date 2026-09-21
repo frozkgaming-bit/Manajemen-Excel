@@ -19,6 +19,7 @@ export function getCurrentIndex() { return currentIndex; }
 export function setAllData(val) { allData = val; }
 export function setFilteredData(val) { filteredData = val; }
 export function setCurrentIndex(val) { currentIndex = val; }
+export function setHeaders(val) { headers = val; }
 
 export function setupHeadersIfNeeded() {
     const tableHead = document.getElementById('tableHead');
@@ -75,6 +76,8 @@ export async function fetchPaginatedData() {
     const searchCategory = document.getElementById('searchCategory');
     const searchInput = document.getElementById('searchInput');
     const tableBody = document.getElementById('tableBody');
+    const filterSummary = document.getElementById('filterSummary');
+    const countFiltered = document.getElementById('countFiltered');
 
     if (isPulling || !hasMorePullData) return;
     
@@ -86,41 +89,36 @@ export async function fetchPaginatedData() {
         const from = (currentPullPage - 1) * limit;
         const to = from + limit - 1;
         
-        const selectQuery = 'id,' + DB_COLUMNS.join(',');
+        let query = supabaseClient.from(TABLE_NAME).select('*', { count: currentPullPage === 1 ? 'exact' : undefined }).order('id', { ascending: true }).range(from, to);
         
-        let query = supabaseClient
-            .from(TABLE_NAME)
-            .select(selectQuery)
-            .order('id', { ascending: true })
-            .range(from, to);
-            
-        currentSearchTerm = searchInput ? searchInput.value.trim() : "";
-
-        if (currentSearchTerm !== "") {
+        const searchTerm = searchInput ? searchInput.value.trim() : "";
+        if (searchTerm !== "") {
             const selectedCategory = searchCategory.value;
-            
             if (selectedCategory === 'all') {
-                const orFilter = DB_COLUMNS.map(col => `${col}.ilike.%${currentSearchTerm}%`).join(',');
+                const sanitizedTerm = searchTerm.replace(/[(),]/g, '');
+                const orFilter = DB_COLUMNS.map(col => `${col}.ilike.*${sanitizedTerm}*`).join(',');
                 query = query.or(orFilter);
             } else {
-                query = query.ilike(selectedCategory, `%${currentSearchTerm}%`);
+                query = query.ilike(selectedCategory, `%${searchTerm}%`);
             }
         }
         
-        const { data, error } = await query;
+        const { data, error, count } = await query;
         if (error) throw error;
         
+        if (currentPullPage === 1) {
+            if (searchTerm !== "") {
+                if (filterSummary) filterSummary.style.display = "inline";
+                if (countFiltered) countFiltered.innerText = count !== null ? count : 0;
+            } else {
+                if (filterSummary) filterSummary.style.display = "none";
+            }
+        }
+
         if (data && data.length > 0) {
             setupHeadersIfNeeded();
-            
             allData.push(...data);
-            
-            if (currentSearchTerm !== "") {
-                filteredData.push(...data);
-            } else {
-                filteredData = allData;
-            }
-            
+            filteredData = [...allData];
             loadMoreData();
             
             if (data.length < limit) hasMorePullData = false;
@@ -128,7 +126,8 @@ export async function fetchPaginatedData() {
         } else {
             hasMorePullData = false;
             if (currentPullPage === 1) {
-                tableBody.innerHTML = "<tr><td colspan='100%' style='text-align:center;'>Data tidak ditemukan</td></tr>";
+                if (searchTerm !== "" && countFiltered) countFiltered.innerText = "0";
+                tableBody.innerHTML = "<tr><td colspan='100%' style='text-align:center; padding: 15px;'>Data tidak ditemukan</td></tr>";
             }
         }
     } catch (error) {
@@ -147,28 +146,27 @@ export function resetPagination() {
     currentIndex = 0;
     const tableBody = document.getElementById('tableBody');
     if (tableBody) tableBody.innerHTML = "";
+    
+    const searchInput = document.getElementById('searchInput');
+    const filterSummary = document.getElementById('filterSummary');
+    const countFiltered = document.getElementById('countFiltered');
+    if (searchInput && searchInput.value.trim() === "") {
+        if (filterSummary) filterSummary.style.display = "none";
+    } else if (countFiltered) {
+        countFiltered.innerText = "0";
+    }
 }
 
 export async function fetchAllDataConcurrently() {
     const limit = 1000;
-
-    const { count, error: countError } = await supabaseClient
-        .from(TABLE_NAME)
-        .select('*', { count: 'exact', head: true });
-
-    if (countError) {
-        console.error("Gagal menghitung data", countError);
-        alert("Gagal menghitung total data: " + countError.message);
-        return null;
-    }
-    
+    const { count, error: countError } = await supabaseClient.from(TABLE_NAME).select('*', { count: 'exact', head: true });
+    if (countError) { alert("Gagal menghitung total data: " + countError.message); return null; }
     if (count === 0) return [];
 
     const totalPages = Math.ceil(count / limit);
     const maxConcurrent = 5;
     const pagedData = new Array(totalPages);
     let currentPage = 0;
-
     const selectQuery = 'id,' + DB_COLUMNS.join(',');
 
     const fetchWorker = async () => {
@@ -176,31 +174,14 @@ export async function fetchAllDataConcurrently() {
             const page = currentPage++; 
             const from = page * limit;
             const to = from + limit - 1;
-
-            const { data, error } = await supabaseClient
-                .from(TABLE_NAME)
-                .select(selectQuery)
-                .order('id', { ascending: true })
-                .range(from, to);
-
+            const { data, error } = await supabaseClient.from(TABLE_NAME).select(selectQuery).order('id', { ascending: true }).range(from, to);
             if (error) throw error;
             pagedData[page] = data; 
         }
     };
 
-    const workers = Array.from(
-        { length: Math.min(maxConcurrent, totalPages) }, 
-        () => fetchWorker()
-    );
-
-    try {
-        await Promise.all(workers);
-    } catch (error) {
-        console.error("Terjadi kegagalan penarikan data paralel:", error);
-        alert("Gagal mengekspor data: " + error.message);
-        return null;
-    }
-
+    const workers = Array.from({ length: Math.min(maxConcurrent, totalPages) }, () => fetchWorker());
+    try { await Promise.all(workers); } catch (error) { alert("Gagal mengekspor data: " + error.message); return null; }
     return pagedData.flat();
 }
 

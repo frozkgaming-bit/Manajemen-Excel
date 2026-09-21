@@ -5,12 +5,8 @@ import { setupHeadersIfNeeded, loadMoreData, fetchAllDataConcurrently, getHeader
 function cleanSuratUkur(value) {
     if (!value) return "";
     const str = value.toString().trim();
-    
     const match = str.match(/^((?:SU|GS)?[.\s]?\d+)\/[^/]+\/(\d{4})$/i);
-    if (match) {
-        return `${match[1].trim()}/${match[2]}`;
-    }
-    
+    if (match) return `${match[1].trim()}/${match[2]}`;
     return str;
 }
 
@@ -53,7 +49,6 @@ export async function sendToBackendInChunks(dataArray, chunkSize = 10000) {
     uploadDone.disabled = false;
 
     alert(`Selesai! Berhasil menyimpan ${successCount} dari ${dataArray.length} baris ke database.`);
-    
     fetchServerCounts();
 }
 
@@ -66,7 +61,6 @@ export function initExcelHandlers() {
         fileUploadMain.addEventListener('change', function(e) {
             var file = e.target.files[0];
             if (!file) return;
-            
             var reader = new FileReader();
             reader.onload = function(e) {
                 var data = new Uint8Array(e.target.result);
@@ -75,25 +69,16 @@ export function initExcelHandlers() {
                 var worksheet = workbook.Sheets[firstSheetName];
                 var rawData = XLSX.utils.sheet_to_json(worksheet, {defval: ""});
 
-                if(rawData.length === 0) {
-                    alert("File kosong.");
-                    return;
-                }
+                if(rawData.length === 0) { alert("File kosong."); return; }
 
                 var newData = rawData.map(function(row) {
                     var lowerRow = {};
-                    for (var key in row) {
-                        lowerRow[key.toLowerCase()] = row[key];
-                    }
-                    if (lowerRow['surat_ukur']) {
-                        lowerRow['surat_ukur'] = cleanSuratUkur(lowerRow['surat_ukur']);
-                    }
+                    for (var key in row) lowerRow[key.toLowerCase()] = row[key];
+                    if (lowerRow['surat_ukur']) lowerRow['surat_ukur'] = cleanSuratUkur(lowerRow['surat_ukur']);
                     return lowerRow;
                 });
 
-                newData.forEach(row => {
-                    row['keterangan'] = "Belum Selesai";
-                });
+                newData.forEach(row => { row['keterangan'] = "Belum Selesai"; });
 
                 setupHeadersIfNeeded();
 
@@ -101,11 +86,7 @@ export function initExcelHandlers() {
                 let uniqueMap = new Map();
                 newData.forEach(item => {
                     item['keterangan'] = "Belum Selesai";
-                    let signature = headers
-                        .filter(header => header !== 'keterangan')
-                        .map(header => (item[header] !== undefined && item[header] !== null ? item[header].toString().trim() : ''))
-                        .join('__');
-                    
+                    let signature = headers.filter(header => header !== 'keterangan').map(header => (item[header] !== undefined && item[header] !== null ? item[header].toString().trim() : '')).join('__');
                     uniqueMap.set(signature, item);
                 });
                 
@@ -121,9 +102,7 @@ export function initExcelHandlers() {
                 
                 loadMoreData();
                 fetchServerCounts();
-                
                 sendToBackendInChunks(cleanedNewData, 10000);
-                
                 e.target.value = ""; 
             };
             reader.readAsArrayBuffer(file);
@@ -134,7 +113,6 @@ export function initExcelHandlers() {
         fileUploadDone.addEventListener('change', function(e) {
             var file = e.target.files[0];
             if (!file) return;
-            
             var reader = new FileReader();
             reader.onload = function(e) {
                 var data = new Uint8Array(e.target.result);
@@ -143,19 +121,12 @@ export function initExcelHandlers() {
                 var worksheet = workbook.Sheets[firstSheetName];
                 var rawData = XLSX.utils.sheet_to_json(worksheet, {defval: ""});
 
-                if(rawData.length === 0) {
-                    alert("File kosong.");
-                    return;
-                }
+                if(rawData.length === 0) { alert("File kosong."); return; }
 
                 var newData = rawData.map(function(row) {
                     var lowerRow = {};
-                    for (var key in row) {
-                        lowerRow[key.toLowerCase()] = row[key];
-                    }
-                    if (lowerRow['surat_ukur']) {
-                        lowerRow['surat_ukur'] = cleanSuratUkur(lowerRow['surat_ukur']);
-                    }
+                    for (var key in row) lowerRow[key.toLowerCase()] = row[key];
+                    if (lowerRow['surat_ukur']) lowerRow['surat_ukur'] = cleanSuratUkur(lowerRow['surat_ukur']);
                     return lowerRow;
                 });
 
@@ -165,11 +136,7 @@ export function initExcelHandlers() {
                 let uniqueMap = new Map();
                 newData.forEach(item => {
                     item['keterangan'] = "Selesai";
-                    let signature = headers
-                        .filter(header => header !== 'keterangan')
-                        .map(header => (item[header] !== undefined && item[header] !== null ? item[header].toString().trim() : ''))
-                        .join('__');
-                    
+                    let signature = headers.filter(header => header !== 'keterangan').map(header => (item[header] !== undefined && item[header] !== null ? item[header].toString().trim() : '')).join('__');
                     uniqueMap.set(signature, item);
                 });
                 
@@ -178,22 +145,14 @@ export function initExcelHandlers() {
                 let mapIndex = new Map();
 
                 allData.forEach((item, idx) => {
-                    let signature = headers
-                        .filter(header => header !== 'keterangan')
-                        .map(header => (item[header] !== undefined && item[header] !== null ? item[header].toString().trim() : ''))
-                        .join('__');
+                    let signature = headers.filter(header => header !== 'keterangan').map(header => (item[header] !== undefined && item[header] !== null ? item[header].toString().trim() : '')).join('__');
                     mapIndex.set(signature, idx);
                 });
 
                 cleanedNewData.forEach(newItem => {
-                    let newSignature = headers
-                        .filter(header => header !== 'keterangan')
-                        .map(header => (newItem[header] !== undefined && newItem[header] !== null ? newItem[header].toString().trim() : ''))
-                        .join('__');
-
+                    let newSignature = headers.filter(header => header !== 'keterangan').map(header => (newItem[header] !== undefined && newItem[header] !== null ? newItem[header].toString().trim() : '')).join('__');
                     if (mapIndex.has(newSignature)) {
-                        let existingIndex = mapIndex.get(newSignature);
-                        allData[existingIndex] = newItem;
+                        allData[mapIndex.get(newSignature)] = newItem;
                     } else {
                         allData.push(newItem);
                         mapIndex.set(newSignature, allData.length - 1);
@@ -208,9 +167,7 @@ export function initExcelHandlers() {
                 
                 loadMoreData();
                 fetchServerCounts();
-                
                 sendToBackendInChunks(cleanedNewData, 10000);
-                
                 e.target.value = ""; 
             };
             reader.readAsArrayBuffer(file);
@@ -221,32 +178,36 @@ export function initExcelHandlers() {
         btnPrint.addEventListener('click', async function() {
             const btn = this;
             const originalText = btn.innerText;
-            
             btn.innerText = "Mengekspor... Mohon tunggu";
             btn.disabled = true;
 
             try {
                 const allExportData = await fetchAllDataConcurrently();
-
                 if (!allExportData || allExportData.length === 0) {
                     alert("Tidak ada data untuk diexport di database.");
                     return;
                 }
 
                 const columns = DB_COLUMNS;
+                const formattedHeaders = ["NO"];
+                for (let i = 0; i < columns.length; i++) {
+                    formattedHeaders.push(columns[i].replace(/_/g, ' ').toUpperCase());
+                }
 
-                let dataToExport = allExportData.map((row, i) => {
-                    let rowData = { "NO": i + 1 };
-                    
-                    columns.forEach(h => {
-                        let headerTitle = h.replace(/_/g, ' ').toUpperCase(); 
-                        rowData[headerTitle] = row[h] !== undefined && row[h] !== null ? row[h] : '';
-                    });
-                    
-                    return rowData;
-                });
+                const aoaData = [formattedHeaders];
 
-                const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+                for (let i = 0; i < allExportData.length; i++) {
+                    const row = allExportData[i];
+                    const rowArray = [i + 1];
+                    for (let j = 0; j < columns.length; j++) {
+                        const col = columns[j];
+                        rowArray.push(row[col] !== undefined && row[col] !== null ? row[col] : '');
+                    }
+                    aoaData.push(rowArray);
+                }
+
+                allExportData.length = 0; 
+                const worksheet = XLSX.utils.aoa_to_sheet(aoaData);
                 const workbook = XLSX.utils.book_new();
                 XLSX.utils.book_append_sheet(workbook, worksheet, "Data_Cimahi");
                 XLSX.writeFile(workbook, "Data_Kwalitas_Cimahi.xlsx");
@@ -260,16 +221,4 @@ export function initExcelHandlers() {
             }
         });
     }
-}
-
-function cleanSuratUkur(value) {
-    if (!value) return "";
-    const str = value.toString().trim();
-    
-    const match = str.match(/^((?:SU|GS)?[.\s]?\d+)\/[^/]+\/(\d{4})$/i);
-    if (match) {
-        return `${match[1].trim()}/${match[2]}`;
-    }
-    
-    return str;
 }
