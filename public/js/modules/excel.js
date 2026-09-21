@@ -2,6 +2,20 @@ import { supabaseClient, TABLE_NAME, DB_COLUMNS } from '../config/supabase.js';
 import { fetchServerCounts } from './stats.js';
 import { setupHeadersIfNeeded, appendData, loadMoreData, fetchAllDataConcurrently, getHeaders, getAllData } from './table.js';
 
+// Fungsi pembersihan kolom surat_ukur: SU.00144/CIBEBER/2000 -> SU.00144/2000
+function cleanSuratUkur(value) {
+    if (!value) return "";
+    const str = value.toString().trim();
+    
+    // Menangkap format SU/GS + Nomor dan Tahun (menghilangkan nama kelurahan di tengah)
+    const match = str.match(/^((?:SU|GS)?[.\s]?\d+)\/[^/]+\/(\d{4})$/i);
+    if (match) {
+        return `${match[1].trim()}/${match[2]}`;
+    }
+    
+    return str;
+}
+
 export async function sendToBackendInChunks(dataArray, chunkSize = 10000) {
     if (!dataArray || dataArray.length === 0) return;
 
@@ -72,6 +86,12 @@ export function initExcelHandlers() {
                     for (var key in row) {
                         lowerRow[key.toLowerCase()] = row[key];
                     }
+                    
+                    // Pembersihan kolom surat_ukur otomatis
+                    if (lowerRow['surat_ukur']) {
+                        lowerRow['surat_ukur'] = cleanSuratUkur(lowerRow['surat_ukur']);
+                    }
+                    
                     return lowerRow;
                 });
 
@@ -133,6 +153,12 @@ export function initExcelHandlers() {
                     for (var key in row) {
                         lowerRow[key.toLowerCase()] = row[key];
                     }
+                    
+                    // Pembersihan kolom surat_ukur otomatis
+                    if (lowerRow['surat_ukur']) {
+                        lowerRow['surat_ukur'] = cleanSuratUkur(lowerRow['surat_ukur']);
+                    }
+                    
                     return lowerRow;
                 });
 
