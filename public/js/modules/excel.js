@@ -1,6 +1,6 @@
 import { supabaseClient, TABLE_NAME, DB_COLUMNS } from '../config/supabase.js';
 import { fetchServerCounts } from './stats.js';
-import { setupHeadersIfNeeded, appendData, loadMoreData, fetchAllDataConcurrently, getHeaders, getAllData } from './table.js';
+import { setupHeadersIfNeeded, loadMoreData, fetchAllDataConcurrently, getHeaders, getAllData, setAllData, setFilteredData, setCurrentIndex } from './table.js';
 
 function cleanSuratUkur(value) {
     if (!value) return "";
@@ -14,47 +14,46 @@ function cleanSuratUkur(value) {
     return str;
 }
 
-export async function sendToBackendInChunks(dataArray, chunkSize = 2000) {
+export async function sendToBackendInChunks(dataArray, chunkSize = 10000) {
     if (!dataArray || dataArray.length === 0) return;
 
     let successCount = 0;
     const totalChunks = Math.ceil(dataArray.length / chunkSize);
     
     const loadingIndicator = document.getElementById('loadingIndicator');
+    loadingIndicator.style.display = "block";
+    loadingIndicator.innerText = `Mengunggah 0 / ${dataArray.length} baris ke server...`;
+    
     const uploadMain = document.getElementById('fileUploadMain');
     const uploadDone = document.getElementById('fileUploadDone');
-    
-    if (loadingIndicator) loadingIndicator.style.display = "block";
-    if (uploadMain) uploadMain.disabled = true;
-    if (uploadDone) uploadDone.disabled = true;
+    uploadMain.disabled = true;
+    uploadDone.disabled = true;
 
     for (let i = 0; i < totalChunks; i++) {
         const from = i * chunkSize;
         const chunk = dataArray.slice(from, from + chunkSize);
+        console.log(`Mengirim batch baris ${from + 1} hingga ${from + chunk.length}...`);
         
-        if (loadingIndicator) {
-            loadingIndicator.innerText = `Mengunggah ${successCount} / ${dataArray.length} baris...`;
-        }
-
         const { error } = await supabaseClient
             .from(TABLE_NAME)
             .upsert(chunk, { onConflict: 'kelurahan,nomor_hak,surat_ukur,nib,luas,produk,luas_peta,validator_tekstual,validator_peta,blokir_internal,kw,pemilik_pertama,pemilik_akhir,tipe_hak' });
 
         if (error) {
-            console.error(`Batch ${i + 1} error:`, error.message);
+            console.error(`Gagal pada batch ${from + 1}:`, error.message);
         } else {
             successCount += chunk.length;
         }
+        
+        loadingIndicator.innerText = `Mengunggah ${successCount} / ${dataArray.length} baris ke server...`;
     }
 
-    if (loadingIndicator) {
-        loadingIndicator.style.display = "none";
-        loadingIndicator.innerText = "Memuat data...";
-    }
-    if (uploadMain) uploadMain.disabled = false;
-    if (uploadDone) uploadDone.disabled = false;
+    loadingIndicator.style.display = "none";
+    loadingIndicator.innerText = "Memuat data...";
+    uploadMain.disabled = false;
+    uploadDone.disabled = false;
 
-    alert(`Selesai! Berhasil menyimpan ${successCount} / ${dataArray.length} baris.`);
+    alert(`Selesai! Berhasil menyimpan ${successCount} dari ${dataArray.length} baris ke database.`);
+    
     fetchServerCounts();
 }
 
@@ -86,11 +85,9 @@ export function initExcelHandlers() {
                     for (var key in row) {
                         lowerRow[key.toLowerCase()] = row[key];
                     }
-                    
                     if (lowerRow['surat_ukur']) {
                         lowerRow['surat_ukur'] = cleanSuratUkur(lowerRow['surat_ukur']);
                     }
-                    
                     return lowerRow;
                 });
 
@@ -113,9 +110,13 @@ export function initExcelHandlers() {
                 });
                 
                 let cleanedNewData = Array.from(uniqueMap.values());
-                appendData(cleanedNewData);
+                let allData = getAllData();
+                allData = allData.concat(cleanedNewData);
+                setAllData(allData);
                 
                 document.getElementById('searchInput').value = ""; 
+                setFilteredData([...allData]); 
+                setCurrentIndex(0);
                 document.getElementById('tableBody').innerHTML = ""; 
                 
                 loadMoreData();
@@ -152,11 +153,9 @@ export function initExcelHandlers() {
                     for (var key in row) {
                         lowerRow[key.toLowerCase()] = row[key];
                     }
-                    
                     if (lowerRow['surat_ukur']) {
                         lowerRow['surat_ukur'] = cleanSuratUkur(lowerRow['surat_ukur']);
                     }
-                    
                     return lowerRow;
                 });
 
@@ -201,7 +200,10 @@ export function initExcelHandlers() {
                     }
                 });
                 
+                setAllData(allData);
                 document.getElementById('searchInput').value = ""; 
+                setFilteredData([...allData]); 
+                setCurrentIndex(0);
                 document.getElementById('tableBody').innerHTML = ""; 
                 
                 loadMoreData();
@@ -225,7 +227,7 @@ export function initExcelHandlers() {
 
             try {
                 const allExportData = await fetchAllDataConcurrently();
-                
+
                 if (!allExportData || allExportData.length === 0) {
                     alert("Tidak ada data untuk diexport di database.");
                     return;
@@ -233,28 +235,18 @@ export function initExcelHandlers() {
 
                 const columns = DB_COLUMNS;
 
-                const formattedHeaders = ["NO"];
-                for (let i = 0; i < columns.length; i++) {
-                    formattedHeaders.push(columns[i].replace(/_/g, ' ').toUpperCase());
-                }
-
-                const aoaData = [formattedHeaders];
-
-                for (let i = 0; i < allExportData.length; i++) {
-                    const row = allExportData[i];
-                    const rowArray = [i + 1];
+                let dataToExport = allExportData.map((row, i) => {
+                    let rowData = { "NO": i + 1 };
                     
-                    for (let j = 0; j < columns.length; j++) {
-                        const col = columns[j];
-                        rowArray.push(row[col] !== undefined && row[col] !== null ? row[col] : '');
-                    }
+                    columns.forEach(h => {
+                        let headerTitle = h.replace(/_/g, ' ').toUpperCase(); 
+                        rowData[headerTitle] = row[h] !== undefined && row[h] !== null ? row[h] : '';
+                    });
                     
-                    aoaData.push(rowArray);
-                }
+                    return rowData;
+                });
 
-                allExportData.length = 0; 
-
-                const worksheet = XLSX.utils.aoa_to_sheet(aoaData);
+                const worksheet = XLSX.utils.json_to_sheet(dataToExport);
                 const workbook = XLSX.utils.book_new();
                 XLSX.utils.book_append_sheet(workbook, worksheet, "Data_Cimahi");
                 XLSX.writeFile(workbook, "Data_Kwalitas_Cimahi.xlsx");
@@ -268,4 +260,16 @@ export function initExcelHandlers() {
             }
         });
     }
+}
+
+function cleanSuratUkur(value) {
+    if (!value) return "";
+    const str = value.toString().trim();
+    
+    const match = str.match(/^((?:SU|GS)?[.\s]?\d+)\/[^/]+\/(\d{4})$/i);
+    if (match) {
+        return `${match[1].trim()}/${match[2]}`;
+    }
+    
+    return str;
 }
