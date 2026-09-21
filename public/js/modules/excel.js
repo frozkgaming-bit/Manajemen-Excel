@@ -1,6 +1,7 @@
 import { supabaseClient, TABLE_NAME, DB_COLUMNS } from '../config/supabase.js';
 import { fetchServerCounts } from './stats.js';
-import { setupHeadersIfNeeded, loadMoreData, fetchAllDataConcurrently, getHeaders, getAllData, setAllData, setFilteredData, setCurrentIndex, showProgress, updateProgress, hideProgress } from './table.js';
+import { setupHeadersIfNeeded, loadMoreData, fetchAllDataConcurrently, getHeaders, getAllData, setAllData, setFilteredData, setCurrentIndex } from './table.js';
+import { showProgress, updateProgress, hideProgress } from './progress.js';
 
 function cleanSuratUkur(value) {
     if (!value) return "";
