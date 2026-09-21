@@ -4,8 +4,9 @@ import { fetchPaginatedData, resetPagination } from './table.js';
 export function initSearch() {
     const searchCategory = document.getElementById('searchCategory');
     const searchInput = document.getElementById('searchInput');
+    const btnSearch = document.getElementById('btnSearch');
 
-    if (!searchCategory || !searchInput) return;
+    if (!searchCategory || !searchInput || !btnSearch) return;
 
     if (searchCategory.options.length <= 1) {
         DB_COLUMNS.forEach(col => {
@@ -16,16 +17,21 @@ export function initSearch() {
         });
     }
 
-    let searchTimeout = null;
-
     function handleSearch() {
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => {
-            resetPagination();
-            fetchPaginatedData();
-        }, 500);
+        resetPagination();
+        fetchPaginatedData();
     }
 
-    searchInput.addEventListener('input', handleSearch);
+    // Search on button click
+    btnSearch.addEventListener('click', handleSearch);
+    
+    // Search on Enter key press
+    searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            handleSearch();
+        }
+    });
+    
+    // Also trigger search when category changes
     searchCategory.addEventListener('change', handleSearch);
 }
