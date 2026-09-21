@@ -71,86 +71,104 @@ export async function fetchPaginatedData() {
     const searchCategory = document.getElementById('searchCategory');
     const searchInput = document.getElementById('searchInput');
     const tableBody = document.getElementById('tableBody');
+    const filterSummary = document.getElementById('filterSummary');
+    const countFiltered = document.getElementById('countFiltered');
 
     if (isPulling || !hasMorePullData) return;
     
     isPulling = true;
     loadingIndicator.style.display = "block";
-    
+
     try {
         const limit = 50;
-        const from = (currentPullPage - 1) * 50;
-        const to = from + 49;
-        
+        const from = (currentPullPage - 1) * limit;
+        const to = from + limit - 1;
+
         const selectQuery = 'id,' + DB_COLUMNS.join(',');
-        
+        currentSearchTerm = searchInput ? searchInput.value.trim() : "";
+
+        // Sertakan count: 'exact' pada penarikan halaman pertama
         let query = supabaseClient
             .from(TABLE_NAME)
-            .select(selectQuery, { count: 'exact' })
+            .select(selectQuery, { count: currentPullPage === 1 ? 'exact' : undefined })
             .order('id', { ascending: true })
             .range(from, to);
-        
-        const searchTerm = searchInput ? searchInput.value.trim() : "";
-        
-        if (searchTerm) {
-            const selectedCategory = document.getElementById('searchCategory')?.value || 'all';
-            
+
+        if (currentSearchTerm !== "") {
+            const selectedCategory = searchCategory ? searchCategory.value : 'all';
+
             if (selectedCategory === 'all') {
-                // Safe PostgREST or() format: use .ilike.*term* syntax
-                const orConditions = DB_COLUMNS.map(col => `${col}.ilike.*${searchTerm}*`).join(',');
-                query = query.or(orConditions);
+                const sanitizedTerm = currentSearchTerm.replace(/[(),]/g, '');
+                const orFilter = DB_COLUMNS.map(col => `${col}.ilike.*${sanitizedTerm}*`).join(',');
+                query = query.or(orFilter);
             } else {
-                query = query.ilike(selectedCategory, `%${searchTerm}%`);
+                query = query.ilike(selectedCategory, `%${currentSearchTerm}%`);
             }
         }
-        
+
         const { data, error, count } = await query;
         if (error) throw error;
-        
+
+        // Tampilkan info "Ditemukan: N" jika user sedang mencari kata kunci
+        if (currentPullPage === 1) {
+            if (currentSearchTerm !== "") {
+                if (filterSummary) filterSummary.style.display = "inline";
+                if (countFiltered) countFiltered.innerText = count !== null && count !== undefined ? count : 0;
+            } else {
+                // Sembunyikan jika pencarian kosong (menampilkan data normal)
+                if (filterSummary) filterSummary.style.display = "none";
+            }
+        }
+
         if (data && data.length > 0) {
             setupHeadersIfNeeded();
             
-            // Always push to filteredData for rendering
             filteredData.push(...data);
-            
             loadMoreData();
-            
-            // Update filtered count from server
-            const filterSummary = document.getElementById('filterSummary');
-            const countFiltered = document.getElementById('countFiltered');
-            if (countFiltered && count !== undefined) {
-                countFiltered.innerText = count;
-                if (filterSummary) filterSummary.style.display = 'inline-block';
+
+            if (data.length < limit) {
+                hasMorePullData = false;
+            } else {
+                currentPullPage++;
             }
-            
-            if (data.length < 50) hasMorePullData = false;
-            else currentPullPage++;
         } else {
             hasMorePullData = false;
             if (currentPullPage === 1) {
-                document.getElementById('tableBody').innerHTML = "<tr><td colspan='100%' style='text-align:center;'>Data tidak ditemukan</td></tr>";
+                // Pastikan angka tetap 0 jika data kosong
+                if (currentSearchTerm !== "" && countFiltered) {
+                    countFiltered.innerText = "0";
+                }
+                tableBody.innerHTML = "<tr><td colspan='100%' style='text-align:center; padding: 15px;'>Data tidak ditemukan</td></tr>";
             }
         }
     } catch (error) {
         console.error("Error fetching data:", error);
     } finally {
         isPulling = false;
-        document.getElementById('loadingIndicator').style.display = "none";
+        loadingIndicator.style.display = "none";
     }
 }
 
 export function resetPagination() {
     currentPullPage = 1;
     hasMorePullData = true;
-    filteredData.length = 0;
+    allData = [];
+    filteredData = [];
     currentIndex = 0;
-    document.getElementById('tableBody').innerHTML = "";
     
-    // Reset filtered count display
+    const tableBody = document.getElementById('tableBody');
+    if (tableBody) tableBody.innerHTML = "";
+    
+    // Jangan langsung sembunyikan jika searchInput masih memiliki teks pencarian
+    const searchInput = document.getElementById('searchInput');
     const filterSummary = document.getElementById('filterSummary');
     const countFiltered = document.getElementById('countFiltered');
-    if (filterSummary) filterSummary.style.display = 'none';
-    if (countFiltered) countFiltered.innerText = 0;
+
+    if (searchInput && searchInput.value.trim() === "") {
+        if (filterSummary) filterSummary.style.display = "none";
+    } else {
+        if (countFiltered) countFiltered.innerText = "0";
+    }
 }
 
 export function appendData(newData) {
