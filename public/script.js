@@ -444,72 +444,71 @@ document.getElementById('btnPullData').addEventListener('click', async function(
 });
 
 // --- FETCH ALL DATA CONCURRENTLY (Untuk Print/Export) ---
-// --- FETCH ALL DATA CONCURRENTLY (Untuk Print/Export) ---
 async function fetchAllDataConcurrently() {
     const limit = 1000;
-    let allFetchedData = [];
-    
+
     // 1. Ambil total data terlebih dahulu
     const { count, error: countError } = await supabaseClient
         .from(TABLE_NAME)
         .select('*', { count: 'exact', head: true });
-        
+
     if (countError) {
         console.error("Gagal menghitung data", countError);
         alert("Gagal menghitung total data: " + countError.message);
         return null;
     }
-    if (count === 0) {
-        return [];
-    }
+    
+    if (count === 0) return [];
 
-    // 2. Hitung berapa kali request (halaman) yang dibutuhkan
     const totalPages = Math.ceil(count / limit);
-    const maxConcurrent = 3; // Maksimal 3 request paralel
-    let promises = [];
-    
-    // Array penampung agar urutan data halaman tidak acak meski prosesnya paralel
-    let pagedData = new Array(totalPages);
+    const maxConcurrent = 5; // Bisa dinaikkan (misal 5) karena aliran request sekarang non-blocking
+    const pagedData = new Array(totalPages);
+    let currentPage = 0;
 
-    // 3. Looping untuk membuat antrean request
-    for (let page = 0; page < totalPages; page++) {
-        const from = page * limit;
-        const to = from + limit - 1;
-        console.log(`Menarik data baris ${from + 1} sampai ${to + 1}...`);
-        
-        // PENTING: Wajib pakai .order('id') agar database tidak mengacak paginasi
-        const requestPromise = supabaseClient
-            .from(TABLE_NAME)
-            .select('*')
-            .order('id', { ascending: true }) 
-            .range(from, to)
-            .then(({ data, error }) => {
-                if (error) throw error;
-                // Simpan di indeks spesifik agar urutannya mengunci
-                pagedData[page] = data; 
-            });
+    // 2. Eksplisit pilih kolom yang relevan saja untuk memangkas ukuran payload JSON (Opsional, tapi sangat disarankan)
+    // DB_COLUMNS sudah dideklarasikan di awal script.js
+    const selectQuery = 'id,' + DB_COLUMNS.join(',');
+
+    // 3. Worker Function (Sliding Window)
+    const fetchWorker = async () => {
+        while (currentPage < totalPages) {
+            // Ambil antrean halaman saat ini, lalu increment untuk worker lain
+            const page = currentPage++; 
+            const from = page * limit;
+            const to = from + limit - 1;
+
+            console.log(`Menarik data baris ${from + 1} sampai ${to + 1}...`);
+
+            const { data, error } = await supabaseClient
+                .from(TABLE_NAME)
+                .select(selectQuery)
+                .order('id', { ascending: true })
+                .range(from, to);
+
+            if (error) throw error;
             
-        promises.push(requestPromise);
-
-        // Jika antrean paralel sudah penuh (3), tunggu sampai selesai
-        if (promises.length >= maxConcurrent) {
-            await Promise.all(promises);
-            promises = []; 
+            // Simpan di indeks yang sesuai agar data tetap terurut (Hal 1 -> Hal 2 -> dst)
+            pagedData[page] = data; 
         }
-    }
-    
-    // Tunggu sisa batch terakhir
-    if (promises.length > 0) {
-        await Promise.all(promises);
+    };
+
+    // 4. Jalankan worker sejumlah batas maksimal konkurensi
+    const workers = Array.from(
+        { length: Math.min(maxConcurrent, totalPages) }, 
+        () => fetchWorker()
+    );
+
+    try {
+        await Promise.all(workers);
+    } catch (error) {
+        console.error("Terjadi kegagalan penarikan data paralel:", error);
+        alert("Gagal mengekspor data: " + error.message);
+        return null;
     }
 
-    // 4. Gabungkan (flatten) array hasil paginasi secara urut (Hal 1 -> Hal 2 -> Hal 3)
-    for (let i = 0; i < totalPages; i++) {
-        if (pagedData[i]) {
-            allFetchedData.push(...pagedData[i]);
-        }
-    }
-    
+    // 5. Gunakan method .flat() native JS yang jauh lebih cepat daripada looping push manual
+    const allFetchedData = pagedData.flat();
+
     console.log(`Selesai! Berhasil menarik ${allFetchedData.length} data aktual sesuai urutan.`);
     return allFetchedData;
 }
