@@ -3,6 +3,7 @@
   "version": "2.0.0",
   "description": "Aplikasi pengolah Excel dengan Vercel dan Supabase (Static Frontend)",
   "scripts": {
+    "build": "echo done",
     "dev": "npx serve public"
   }
 }
