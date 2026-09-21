@@ -37,10 +37,17 @@ export function setupHeadersIfNeeded() {
 
 export function loadMoreData() {
     const tableBody = document.getElementById('tableBody');
-    const loadingIndicator = document.getElementById('loadingIndicator');
+    const progressContainer = document.getElementById('progressContainer');
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
 
     if (currentIndex >= filteredData.length) return;
-    loadingIndicator.style.display = "block";
+    
+    if (progressContainer) {
+        progressContainer.style.display = "block";
+        progressBar.style.width = "100%";
+        progressText.innerText = "Memuat data...";
+    }
 
     let endIndex = currentIndex + batchSize;
     if (endIndex > filteredData.length) {
@@ -68,11 +75,16 @@ export function loadMoreData() {
 
     tableBody.insertAdjacentHTML('beforeend', rowsHtml);
     currentIndex = endIndex;
-    loadingIndicator.style.display = "none";
+    
+    if (progressContainer) {
+        progressContainer.style.display = "none";
+    }
 }
 
 export async function fetchPaginatedData() {
-    const loadingIndicator = document.getElementById('loadingIndicator');
+    const progressContainer = document.getElementById('progressContainer');
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
     const searchCategory = document.getElementById('searchCategory');
     const searchInput = document.getElementById('searchInput');
     const tableBody = document.getElementById('tableBody');
@@ -82,7 +94,11 @@ export async function fetchPaginatedData() {
     if (isPulling || !hasMorePullData) return;
     
     isPulling = true;
-    loadingIndicator.style.display = "block";
+    if (progressContainer) {
+        progressContainer.style.display = "block";
+        progressBar.style.width = "100%";
+        progressText.innerText = "Memuat data...";
+    }
     
     try {
         const limit = 50;
@@ -134,7 +150,7 @@ export async function fetchPaginatedData() {
         console.error("Error fetching data:", error);
     } finally {
         isPulling = false;
-        loadingIndicator.style.display = "none";
+        if (progressContainer) progressContainer.style.display = "none";
     }
 }
 
@@ -167,6 +183,18 @@ export async function fetchAllDataConcurrently() {
     const maxConcurrent = 5;
     const pagedData = new Array(totalPages);
     let currentPage = 0;
+    let completedPages = 0;
+
+    const progressContainer = document.getElementById('progressContainer');
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    
+    if (progressContainer) {
+        progressContainer.style.display = "block";
+        progressBar.style.width = "0%";
+        progressText.innerText = `Menarik 0 / ${totalPages} halaman data... (0%)`;
+    }
+
     const selectQuery = 'id,' + DB_COLUMNS.join(',');
 
     const fetchWorker = async () => {
@@ -177,11 +205,31 @@ export async function fetchAllDataConcurrently() {
             const { data, error } = await supabaseClient.from(TABLE_NAME).select(selectQuery).order('id', { ascending: true }).range(from, to);
             if (error) throw error;
             pagedData[page] = data; 
+            completedPages++;
+
+            if (progressContainer) {
+                const percent = Math.round((completedPages / totalPages) * 100);
+                progressBar.style.width = `${percent}%`;
+                progressText.innerText = `Menarik ${completedPages} / ${totalPages} halaman data... (${percent}%)`;
+            }
         }
     };
 
     const workers = Array.from({ length: Math.min(maxConcurrent, totalPages) }, () => fetchWorker());
-    try { await Promise.all(workers); } catch (error) { alert("Gagal mengekspor data: " + error.message); return null; }
+    try { 
+        await Promise.all(workers); 
+    } catch (error) { 
+        if (progressContainer) progressContainer.style.display = "none";
+        alert("Gagal mengekspor data: " + error.message); 
+        return null; 
+    }
+
+    if (progressContainer) {
+        setTimeout(() => {
+            progressContainer.style.display = "none";
+        }, 1000);
+    }
+    
     return pagedData.flat();
 }
 

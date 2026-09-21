@@ -79,7 +79,12 @@
                 <thead id="tableHead"></thead>
                 <tbody id="tableBody"></tbody>
             </table>
-            <div id="loadingIndicator">Memuat data...</div>
+            <div id="progressContainer" style="display: none; margin-top: 15px; padding: 10px; background: #f8f9fa; border: 1px solid #ccc; border-radius: 5px;">
+                <div id="progressText" style="text-align: center; font-weight: bold; margin-bottom: 8px;">Memuat data...</div>
+                <div style="width: 100%; background-color: #e9ecef; border-radius: 5px; overflow: hidden;">
+                    <div id="progressBar" style="width: 0%; height: 20px; background-color: #28a745; transition: width 0.3s ease;"></div>
+                </div>
+            </div>
         </div>
     </div>
 

@@ -9,21 +9,26 @@ function cleanSuratUkur(value) {
     if (match) return `${match[1].trim()}/${match[2]}`;
     return str;
 }
-
 export async function sendToBackendInChunks(dataArray, chunkSize = 10000) {
     if (!dataArray || dataArray.length === 0) return;
 
     let successCount = 0;
     const totalChunks = Math.ceil(dataArray.length / chunkSize);
     
-    const loadingIndicator = document.getElementById('loadingIndicator');
-    loadingIndicator.style.display = "block";
-    loadingIndicator.innerText = `Mengunggah 0 / ${dataArray.length} baris ke server...`;
+    const progressContainer = document.getElementById('progressContainer');
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    
+    if (progressContainer) {
+        progressContainer.style.display = "block";
+        progressBar.style.width = "0%";
+        progressText.innerText = `Mengunggah 0 / ${dataArray.length} baris... (0%)`;
+    }
     
     const uploadMain = document.getElementById('fileUploadMain');
     const uploadDone = document.getElementById('fileUploadDone');
-    uploadMain.disabled = true;
-    uploadDone.disabled = true;
+    if (uploadMain) uploadMain.disabled = true;
+    if (uploadDone) uploadDone.disabled = true;
 
     for (let i = 0; i < totalChunks; i++) {
         const from = i * chunkSize;
@@ -40,13 +45,21 @@ export async function sendToBackendInChunks(dataArray, chunkSize = 10000) {
             successCount += chunk.length;
         }
         
-        loadingIndicator.innerText = `Mengunggah ${successCount} / ${dataArray.length} baris ke server...`;
+        if (progressContainer) {
+            const percent = Math.round((successCount / dataArray.length) * 100);
+            progressBar.style.width = `${percent}%`;
+            progressText.innerText = `Mengunggah ${successCount} / ${dataArray.length} baris... (${percent}%)`;
+        }
     }
 
-    loadingIndicator.style.display = "none";
-    loadingIndicator.innerText = "Memuat data...";
-    uploadMain.disabled = false;
-    uploadDone.disabled = false;
+    if (progressContainer) {
+        setTimeout(() => {
+            progressContainer.style.display = "none";
+        }, 1500);
+    }
+
+    if (uploadMain) uploadMain.disabled = false;
+    if (uploadDone) uploadDone.disabled = false;
 
     alert(`Selesai! Berhasil menyimpan ${successCount} dari ${dataArray.length} baris ke database.`);
     fetchServerCounts();
