@@ -4,6 +4,6 @@
   "description": "Aplikasi pengolah Excel dengan Vercel dan Supabase (Static Frontend)",
   "scripts": {
     "build": "xcopy /E /I /Y public .",
-    "dev": "vercel dev"
+    "dev": "npx serve public"
   }
 }
