@@ -1,19 +1,14 @@
-# Manajemen Excel (Modular Refactor)
-
-Proyek manajemen data Excel menggunakan Node.js dan Express, dirancang untuk dijalankan di Vercel.
+# Manajemen Excel BOS EDS
+Aplikasi manajemen dan pengolah data Excel statis (Frontend-only) menggunakan Vanilla JavaScript dan Supabase.
 
 ## Fitur
-- Upload data Excel ke database MySQL.
-- Refaktor struktur modular untuk skalabilitas.
-- Integrasi dengan XAMPP/MySQL lokal atau remote.
+- Upload dan parsing data Excel (.xlsx) langsung di browser via SheetJS.
+- Simpan data secara batch ke database Supabase (PostgreSQL).
+- Tarik, cari, filter, dan ekspor data ke format Excel.
 
 ## Struktur Proyek
-- `api/`: Endpoint serverless Vercel.
-- `public/`: Antarmuka frontend (HTML/CSS/JS).
-- `vercel.json`: Konfigurasi deployment Vercel.
+- `public/`: Direktori utama antarmuka frontend (HTML/CSS/JS).
+- `vercel.json`: Konfigurasi deployment statis Vercel.
 
-## Instalasi
-1. Clone repo.
-2. Jalankan `npm install`.
-3. Konfigurasi `.env`.
-4. Jalankan server atau deploy ke Vercel.
+## Deployment
+Karena ini adalah proyek statis murni, cukup jalankan menggunakan Live Server atau deploy folder ini langsung ke Vercel/Netlify.

@@ -1,15 +1,5 @@
 {
   "name": "proyek-bos-eds",
   "version": "2.0.0",
-  "description": "Aplikasi pengolah Excel dengan Vercel dan Supabase",
-  "main": "index.js",
-  "scripts": {
-    "start": "node server.js"
-  },
-  "dependencies": {
-    "@supabase/supabase-js": "^2.39.0"
-  },
-  "engines": {
-    "node": "24.x"
-  }
+  "description": "Aplikasi pengolah Excel dengan Vercel dan Supabase (Static Frontend)"
 }
