@@ -1,6 +1,6 @@
 import { supabaseClient, TABLE_NAME, DB_COLUMNS } from '../config/supabase.js';
 import { fetchServerCounts } from './stats.js';
-import { setupHeadersIfNeeded, loadMoreData, fetchAllDataConcurrently, getHeaders, getAllData, setAllData, setFilteredData, setCurrentIndex } from './table.js';
+import { setupHeadersIfNeeded, loadMoreData, fetchAllDataConcurrently, getHeaders, getAllData, setAllData, setFilteredData, setCurrentIndex, showProgress, updateProgress, hideProgress } from './table.js';
 
 function cleanSuratUkur(value) {
     if (!value) return "";
@@ -13,55 +13,45 @@ export async function sendToBackendInChunks(dataArray, chunkSize = 10000) {
     if (!dataArray || dataArray.length === 0) return;
 
     let successCount = 0;
+    const total = dataArray.length;
     const totalChunks = Math.ceil(dataArray.length / chunkSize);
-    
-    const progressContainer = document.getElementById('progressContainer');
-    const progressBar = document.getElementById('progressBar');
-    const progressText = document.getElementById('progressText');
-    
-    if (progressContainer) {
-        progressContainer.style.display = "block";
-        progressBar.style.width = "0%";
-        progressText.innerText = `Mengunggah 0 / ${dataArray.length} baris... (0%)`;
-    }
-    
+
+    showProgress("Mengunggah Data ke Database", 0, `0 / ${total} baris (0%)`);
+
     const uploadMain = document.getElementById('fileUploadMain');
     const uploadDone = document.getElementById('fileUploadDone');
     if (uploadMain) uploadMain.disabled = true;
     if (uploadDone) uploadDone.disabled = true;
 
-    for (let i = 0; i < totalChunks; i++) {
+    for (let i = 0; i < Math.ceil(total / chunkSize); i++) {
         const from = i * chunkSize;
         const chunk = dataArray.slice(from, from + chunkSize);
-        console.log(`Mengirim batch baris ${from + 1} hingga ${from + chunk.length}...`);
         
         const { error } = await supabaseClient
             .from(TABLE_NAME)
             .upsert(chunk, { onConflict: 'kelurahan,nomor_hak,surat_ukur,nib,luas,produk,luas_peta,validator_tekstual,validator_peta,blokir_internal,kw,pemilik_pertama,pemilik_akhir,tipe_hak' });
 
         if (error) {
-            console.error(`Gagal pada batch ${from + 1}:`, error.message);
+            console.error(`Gagal batch ${i + 1}:`, error.message);
         } else {
             successCount += chunk.length;
         }
-        
-        if (progressContainer) {
-            const percent = Math.round((successCount / dataArray.length) * 100);
-            progressBar.style.width = `${percent}%`;
-            progressText.innerText = `Mengunggah ${successCount} / ${dataArray.length} baris... (${percent}%)`;
-        }
-    }
 
-    if (progressContainer) {
-        setTimeout(() => {
-            progressContainer.style.display = "none";
-        }, 1500);
+        const percent = Math.min(100, Math.round((successCount / total) * 100));
+        updateProgress(percent, `Mengunggah: ${successCount.toLocaleString('id-ID')} / ${total.toLocaleString('id-ID')} baris (${percent}%)`);
+        
+        await new Promise(r => setTimeout(r, 10));
     }
 
     if (uploadMain) uploadMain.disabled = false;
     if (uploadDone) uploadDone.disabled = false;
 
-    alert(`Selesai! Berhasil menyimpan ${successCount} dari ${dataArray.length} baris ke database.`);
+    updateProgress(100, `Selesai! Berhasil menyimpan ${successCount.toLocaleString('id-ID')} baris.`);
+    setTimeout(() => {
+        hideProgress();
+        alert(`Selesai! Berhasil menyimpan ${successCount} dari ${total} baris ke database.`);
+    }, 500);
+
     fetchServerCounts();
 }
 
@@ -74,8 +64,12 @@ export function initExcelHandlers() {
         fileUploadMain.addEventListener('change', function(e) {
             var file = e.target.files[0];
             if (!file) return;
-            var reader = new FileReader();
-            reader.onload = function(e) {
+            
+            showProgress("Membaca File Excel", 10, "Mengekstrak data dari file, mohon tunggu...");
+
+            setTimeout(() => {
+                var reader = new FileReader();
+                reader.onload = function(e) {
                 var data = new Uint8Array(e.target.result);
                 var workbook = XLSX.read(data, {type: 'array'});
                 var firstSheetName = workbook.SheetNames[0];
@@ -115,19 +109,25 @@ export function initExcelHandlers() {
                 
                 loadMoreData();
                 fetchServerCounts();
-                sendToBackendInChunks(cleanedNewData, 10000);
+                sendToBackendInChunks(cleanedNewData, 10000).finally(() => {
+                    hideProgress();
+                });
                 e.target.value = ""; 
             };
             reader.readAsArrayBuffer(file);
-        });
-    }
+        }, 50);
+    });
 
     if (fileUploadDone) {
         fileUploadDone.addEventListener('change', function(e) {
             var file = e.target.files[0];
             if (!file) return;
-            var reader = new FileReader();
-            reader.onload = function(e) {
+            
+            showProgress("Membaca File Excel", 10, "Mengekstrak data dari file, mohon tunggu...");
+
+            setTimeout(() => {
+                var reader = new FileReader();
+                reader.onload = function(e) {
                 var data = new Uint8Array(e.target.result);
                 var workbook = XLSX.read(data, {type: 'array'});
                 var firstSheetName = workbook.SheetNames[0];
@@ -180,12 +180,14 @@ export function initExcelHandlers() {
                 
                 loadMoreData();
                 fetchServerCounts();
-                sendToBackendInChunks(cleanedNewData, 10000);
+                sendToBackendInChunks(cleanedNewData, 10000).finally(() => {
+                    hideProgress();
+                });
                 e.target.value = ""; 
             };
             reader.readAsArrayBuffer(file);
-        });
-    }
+        }, 50);
+    });
 
     if (btnPrint) {
         btnPrint.addEventListener('click', async function() {

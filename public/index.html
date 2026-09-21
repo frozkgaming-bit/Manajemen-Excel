@@ -10,6 +10,16 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
+    <!-- Progress Modal Overlay -->
+    <div id="progressModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); z-index: 99999; justify-content: center; align-items: center;">
+        <div style="background: white; padding: 25px 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); width: 90%; max-width: 480px; text-align: center;">
+            <h3 id="progressTitle" style="margin-top: 0; margin-bottom: 15px; color: #333;">Memproses Data...</h3>
+            <div style="width: 100%; background-color: #e9ecef; border-radius: 6px; overflow: hidden; height: 24px; margin-bottom: 12px; border: 1px solid #ddd;">
+                <div id="progressBar" style="width: 0%; height: 100%; background-color: #28a745; transition: width 0.2s ease;"></div>
+            </div>
+            <div id="progressText" style="font-size: 14px; font-weight: bold; color: #555;">Menyiapkan data...</div>
+        </div>
+
     <!-- BAGIAN LOGIN -->
     <div id="loginSection" style="max-width: 300px; margin: 50px auto; padding: 20px; border: 1px solid #ccc; border-radius: 5px;">
         <h2>Login Sistem</h2>
