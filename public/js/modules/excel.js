@@ -178,7 +178,7 @@ export function initExcelHandlers() {
                     });
 
                     cleanedNewData.forEach(newItem => {
-                        let newSignature = headers.filter(header => header !== 'keterangan').map(header => (newItem[header] !== undefined && newItem[header] !== null ? newItem[header].toLocaleString('id-ID') : '')).join('__');
+                        let newSignature = headers.filter(header => header !== 'keterangan').map(header => (newItem[header] !== undefined && newItem[header] !== null ? newItem[header].toString().trim() : '')).join('__');
                         if (mapIndex.has(newSignature)) {
                             allData[mapIndex.get(newSignature)] = newItem;
                         } else {
@@ -255,12 +255,4 @@ export function initExcelHandlers() {
             }
         });
     }
-}
-
-function cleanSuratUkur(value) {
-    if (!value) return "";
-    const str = value.toString().trim();
-    const match = str.match(/^((?:SU|GS)?[.\s]?\d+)\/[^/]+\/(\d{4})$/i);
-    if (match) return `${match[1].trim()}/${match[2]}`;
-    return str;
 }
