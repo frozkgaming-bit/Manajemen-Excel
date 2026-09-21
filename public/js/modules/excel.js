@@ -2,12 +2,10 @@ import { supabaseClient, TABLE_NAME, DB_COLUMNS } from '../config/supabase.js';
 import { fetchServerCounts } from './stats.js';
 import { setupHeadersIfNeeded, appendData, loadMoreData, fetchAllDataConcurrently, getHeaders, getAllData } from './table.js';
 
-// Fungsi pembersihan kolom surat_ukur: SU.00144/CIBEBER/2000 -> SU.00144/2000
 function cleanSuratUkur(value) {
     if (!value) return "";
     const str = value.toString().trim();
     
-    // Menangkap format SU/GS + Nomor dan Tahun (menghilangkan nama kelurahan di tengah)
     const match = str.match(/^((?:SU|GS)?[.\s]?\d+)\/[^/]+\/(\d{4})$/i);
     if (match) {
         return `${match[1].trim()}/${match[2]}`;
@@ -16,45 +14,47 @@ function cleanSuratUkur(value) {
     return str;
 }
 
-export async function sendToBackendInChunks(dataArray, chunkSize = 10000) {
+export async function sendToBackendInChunks(dataArray, chunkSize = 2000) {
     if (!dataArray || dataArray.length === 0) return;
 
     let successCount = 0;
     const totalChunks = Math.ceil(dataArray.length / chunkSize);
     
     const loadingIndicator = document.getElementById('loadingIndicator');
-    loadingIndicator.style.display = "block";
-    loadingIndicator.innerText = `Mengunggah 0 / ${dataArray.length} baris ke server...`;
-    
     const uploadMain = document.getElementById('fileUploadMain');
     const uploadDone = document.getElementById('fileUploadDone');
-    uploadMain.disabled = true;
-    uploadDone.disabled = true;
+    
+    if (loadingIndicator) loadingIndicator.style.display = "block";
+    if (uploadMain) uploadMain.disabled = true;
+    if (uploadDone) uploadDone.disabled = true;
 
     for (let i = 0; i < totalChunks; i++) {
         const from = i * chunkSize;
         const chunk = dataArray.slice(from, from + chunkSize);
         
+        if (loadingIndicator) {
+            loadingIndicator.innerText = `Mengunggah ${successCount} / ${dataArray.length} baris...`;
+        }
+
         const { error } = await supabaseClient
             .from(TABLE_NAME)
             .upsert(chunk, { onConflict: 'kelurahan,nomor_hak,surat_ukur,nib,luas,produk,luas_peta,validator_tekstual,validator_peta,blokir_internal,kw,pemilik_pertama,pemilik_akhir,tipe_hak' });
 
         if (error) {
-            console.error(`Gagal pada batch ${from + 1}:`, error.message);
+            console.error(`Batch ${i + 1} error:`, error.message);
         } else {
             successCount += chunk.length;
         }
-        
-        loadingIndicator.innerText = `Mengunggah ${successCount} / ${dataArray.length} baris ke server...`;
     }
 
-    loadingIndicator.style.display = "none";
-    loadingIndicator.innerText = "Memuat data...";
-    uploadMain.disabled = false;
-    uploadDone.disabled = false;
+    if (loadingIndicator) {
+        loadingIndicator.style.display = "none";
+        loadingIndicator.innerText = "Memuat data...";
+    }
+    if (uploadMain) uploadMain.disabled = false;
+    if (uploadDone) uploadDone.disabled = false;
 
-    alert(`Selesai! Berhasil menyimpan ${successCount} dari ${dataArray.length} baris ke database.`);
-    
+    alert(`Selesai! Berhasil menyimpan ${successCount} / ${dataArray.length} baris.`);
     fetchServerCounts();
 }
 
@@ -87,7 +87,6 @@ export function initExcelHandlers() {
                         lowerRow[key.toLowerCase()] = row[key];
                     }
                     
-                    // Pembersihan kolom surat_ukur otomatis
                     if (lowerRow['surat_ukur']) {
                         lowerRow['surat_ukur'] = cleanSuratUkur(lowerRow['surat_ukur']);
                     }
@@ -154,7 +153,6 @@ export function initExcelHandlers() {
                         lowerRow[key.toLowerCase()] = row[key];
                     }
                     
-                    // Pembersihan kolom surat_ukur otomatis
                     if (lowerRow['surat_ukur']) {
                         lowerRow['surat_ukur'] = cleanSuratUkur(lowerRow['surat_ukur']);
                     }

@@ -13,8 +13,6 @@ let currentSearchTerm = "";
 
 export function getHeaders() { return headers; }
 export function getAllData() { return allData; }
-export function setSearchTerm(val) { currentSearchTerm = val; }
-export function getSearchTerm() { return currentSearchTerm; }
 
 export function setupHeadersIfNeeded() {
     const tableHead = document.getElementById('tableHead');
@@ -78,25 +76,25 @@ export async function fetchPaginatedData() {
     
     isPulling = true;
     loadingIndicator.style.display = "block";
-
+    
     try {
         const limit = 50;
         const from = (currentPullPage - 1) * limit;
         const to = from + limit - 1;
-
+        
         const selectQuery = 'id,' + DB_COLUMNS.join(',');
-        currentSearchTerm = searchInput ? searchInput.value.trim() : "";
-
-        // Sertakan count: 'exact' pada penarikan halaman pertama
+        
         let query = supabaseClient
             .from(TABLE_NAME)
             .select(selectQuery, { count: currentPullPage === 1 ? 'exact' : undefined })
             .order('id', { ascending: true })
             .range(from, to);
+            
+        currentSearchTerm = searchInput ? searchInput.value.trim() : "";
 
         if (currentSearchTerm !== "") {
             const selectedCategory = searchCategory ? searchCategory.value : 'all';
-
+            
             if (selectedCategory === 'all') {
                 const sanitizedTerm = currentSearchTerm.replace(/[(),]/g, '');
                 const orFilter = DB_COLUMNS.map(col => `${col}.ilike.*${sanitizedTerm}*`).join(',');
@@ -105,36 +103,37 @@ export async function fetchPaginatedData() {
                 query = query.ilike(selectedCategory, `%${currentSearchTerm}%`);
             }
         }
-
+        
         const { data, error, count } = await query;
         if (error) throw error;
 
-        // Tampilkan info "Ditemukan: N" jika user sedang mencari kata kunci
         if (currentPullPage === 1) {
             if (currentSearchTerm !== "") {
                 if (filterSummary) filterSummary.style.display = "inline";
                 if (countFiltered) countFiltered.innerText = count !== null && count !== undefined ? count : 0;
             } else {
-                // Sembunyikan jika pencarian kosong (menampilkan data normal)
                 if (filterSummary) filterSummary.style.display = "none";
             }
         }
-
+        
         if (data && data.length > 0) {
             setupHeadersIfNeeded();
             
-            filteredData.push(...data);
-            loadMoreData();
-
-            if (data.length < limit) {
-                hasMorePullData = false;
+            allData.push(...data);
+            
+            if (currentSearchTerm !== "") {
+                filteredData.push(...data);
             } else {
-                currentPullPage++;
+                filteredData = allData;
             }
+            
+            loadMoreData();
+            
+            if (data.length < limit) hasMorePullData = false;
+            else currentPullPage++;
         } else {
             hasMorePullData = false;
             if (currentPullPage === 1) {
-                // Pastikan angka tetap 0 jika data kosong
                 if (currentSearchTerm !== "" && countFiltered) {
                     countFiltered.innerText = "0";
                 }
@@ -159,7 +158,6 @@ export function resetPagination() {
     const tableBody = document.getElementById('tableBody');
     if (tableBody) tableBody.innerHTML = "";
     
-    // Jangan langsung sembunyikan jika searchInput masih memiliki teks pencarian
     const searchInput = document.getElementById('searchInput');
     const filterSummary = document.getElementById('filterSummary');
     const countFiltered = document.getElementById('countFiltered');
@@ -177,7 +175,7 @@ export function appendData(newData) {
 }
 
 export async function fetchAllDataConcurrently() {
-    const limit = 1000;
+    const limit = 2000;
 
     const { count, error: countError } = await supabaseClient
         .from(TABLE_NAME)
@@ -192,7 +190,7 @@ export async function fetchAllDataConcurrently() {
     if (count === 0) return [];
 
     const totalPages = Math.ceil(count / limit);
-    const maxConcurrent = 5;
+    const maxConcurrent = 8;
     const pagedData = new Array(totalPages);
     let currentPage = 0;
 
