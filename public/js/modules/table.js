@@ -13,6 +13,8 @@ let currentSearchTerm = "";
 
 export function getHeaders() { return headers; }
 export function getAllData() { return allData; }
+export function setSearchTerm(val) { currentSearchTerm = val; }
+export function getSearchTerm() { return currentSearchTerm; }
 
 export function setupHeadersIfNeeded() {
     const tableHead = document.getElementById('tableHead');
@@ -77,69 +79,78 @@ export async function fetchPaginatedData() {
     
     try {
         const limit = 50;
-        const from = (currentPullPage - 1) * limit;
-        const to = from + limit - 1;
+        const from = (currentPullPage - 1) * 50;
+        const to = from + 49;
         
         const selectQuery = 'id,' + DB_COLUMNS.join(',');
         
         let query = supabaseClient
             .from(TABLE_NAME)
-            .select(selectQuery)
+            .select(selectQuery, { count: 'exact' })
             .order('id', { ascending: true })
             .range(from, to);
-            
-        currentSearchTerm = searchInput ? searchInput.value.trim() : "";
-
-        if (currentSearchTerm !== "") {
-            const selectedCategory = searchCategory ? searchCategory.value : 'all';
+        
+        const searchTerm = searchInput ? searchInput.value.trim() : "";
+        
+        if (searchTerm) {
+            const selectedCategory = document.getElementById('searchCategory')?.value || 'all';
             
             if (selectedCategory === 'all') {
-                const orFilter = DB_COLUMNS.map(col => `${col}.ilike.%${currentSearchTerm}%`).join(',');
-                query = query.or(orFilter);
+                // Safe PostgREST or() format: use .ilike.*term* syntax
+                const orConditions = DB_COLUMNS.map(col => `${col}.ilike.*${searchTerm}*`).join(',');
+                query = query.or(orConditions);
             } else {
-                query = query.ilike(selectedCategory, `%${currentSearchTerm}%`);
+                query = query.ilike(selectedCategory, `%${searchTerm}%`);
             }
         }
         
-        const { data, error } = await query;
+        const { data, error, count } = await query;
         if (error) throw error;
         
         if (data && data.length > 0) {
             setupHeadersIfNeeded();
             
-            allData.push(...data);
-            
-            if (currentSearchTerm !== "") {
-                filteredData.push(...data);
-            } else {
-                filteredData = allData;
-            }
+            // Always push to filteredData for rendering
+            filteredData.push(...data);
             
             loadMoreData();
             
-            if (data.length < limit) hasMorePullData = false;
+            // Update filtered count from server
+            const filterSummary = document.getElementById('filterSummary');
+            const countFiltered = document.getElementById('countFiltered');
+            if (countFiltered && count !== undefined) {
+                countFiltered.innerText = count;
+                if (filterSummary) filterSummary.style.display = 'inline-block';
+            }
+            
+            if (data.length < 50) hasMorePullData = false;
             else currentPullPage++;
         } else {
             hasMorePullData = false;
             if (currentPullPage === 1) {
-                tableBody.innerHTML = "<tr><td colspan='100%' style='text-align:center;'>Data tidak ditemukan</td></tr>";
+                document.getElementById('tableBody').innerHTML = "<tr><td colspan='100%' style='text-align:center;'>Data tidak ditemukan</td></tr>";
             }
         }
     } catch (error) {
         console.error("Error fetching data:", error);
     } finally {
         isPulling = false;
-        loadingIndicator.style.display = "none";
+        document.getElementById('loadingIndicator').style.display = "none";
     }
 }
 
 export function resetPagination() {
     currentPullPage = 1;
     hasMorePullData = true;
-    allData.length = 0;
     filteredData.length = 0;
     currentIndex = 0;
     document.getElementById('tableBody').innerHTML = "";
+    
+    // Reset filtered count display
+    const filterSummary = document.getElementById('filterSummary');
+    const countFiltered = document.getElementById('countFiltered');
+    if (filterSummary) filterSummary.style.display = 'none';
+    if (countFiltered) countFiltered.innerText = 0;
 }
 
 export function appendData(newData) {
