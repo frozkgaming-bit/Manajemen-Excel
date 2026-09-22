@@ -3,12 +3,14 @@ import { fetchPaginatedData, initTableScroll, resetPagination } from './modules/
 import { initExcelHandlers } from './modules/excel.js';
 import { initSearch } from './modules/search.js';
 import { fetchServerCounts } from './modules/stats.js';
+import { initStorageHandlers } from './modules/storageHandler.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     initAuth();
     initTableScroll();
     initSearch();
     initExcelHandlers();
+    initStorageHandlers();
 
     const btnPullData = document.getElementById('btnPullData');
     if (btnPullData) {
