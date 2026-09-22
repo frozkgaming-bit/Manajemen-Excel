@@ -1,7 +1,7 @@
 import { uploadDwgFile, listDwgFiles, getPublicUrl } from './storage.js';
 import { showProgress, updateProgress, hideProgress } from './progress.js';
 
-export function initStorageHandlers() {
+export async function initStorageHandlers() {
     const fileInputEl = document.getElementById('dwgFileInput');
     const uploadBtn = document.getElementById('uploadBtn');
     const statusDiv = document.getElementById('uploadStatus');
@@ -26,7 +26,6 @@ export function initStorageHandlers() {
     }
 
     // Handle upload button click
-    const uploadBtn = document.getElementById('uploadBtn');
     if (uploadBtn) {
         uploadBtn.addEventListener('click', async () => {
             const fileInput = document.getElementById('dwgFileInput');

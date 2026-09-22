@@ -1,5 +1,6 @@
 import { supabaseClient } from '../config/supabase.js';
-import { fetchServerCounts } from './stats.js';
+import { fetchServerCounts } from '../modules/stats.js';
+import { navigate } from '../router.js';
 
 export async function initAuth() {
     const btnLogin = document.getElementById('btnLogin');
@@ -8,8 +9,8 @@ export async function initAuth() {
     async function checkUser() {
         const { data: { session } } = await supabaseClient.auth.getSession();
         if (session) {
-            // User is logged in, redirect to dashboard
-            window.location.href = 'index.html';
+            // User is logged in, redirect to dashboard using router
+            window.location.hash = '#/dashboard';
         }
     }
 
@@ -37,7 +38,8 @@ export async function initAuth() {
             if (error) {
                 showError(error.message);
             } else {
-                window.location.href = 'index.html';
+                // Use SPA navigation instead of full page reload
+                window.location.hash = '#/dashboard';
             }
         });
     }

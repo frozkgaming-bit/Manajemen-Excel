@@ -78,7 +78,6 @@ export function loadMoreData() {
         rowsHtml += '</tr>';
     }
 
-    const tableBody = document.getElementById('tableBody');
     if (tableBody) {
         tableBody.insertAdjacentHTML('beforeend', rowsHtml);
     }

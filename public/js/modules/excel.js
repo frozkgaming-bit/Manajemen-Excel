@@ -259,11 +259,3 @@ export function initExcelHandlers() {
         });
     }
 }
-
-function cleanSuratUkur(value) {
-    if (!value) return "";
-    const str = value.toString().trim();
-    const match = str.match(/^((?:SU|GS)?[.\s]?\d+)\/[^/]+\/(\d{4})$/i);
-    if (match) return `${match[1].trim()}/${match[2]}`;
-    return str;
-}
