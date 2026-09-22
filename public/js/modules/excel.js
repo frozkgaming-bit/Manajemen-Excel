@@ -51,8 +51,7 @@ export async function sendToBackendInChunks(dataArray, chunkSize = 5000) {
     updateProgress(100, `Selesai! Berhasil menyimpan ${successCount.toLocaleString('id-ID')} baris.`);
     setTimeout(() => {
         hideProgress();
-        alert(`Selesai! Berhasil menyimpan ${successCount} dari ${total} baris ke database.`);
-    }, 500);
+    }, 2500);
 
     fetchServerCounts();
 }

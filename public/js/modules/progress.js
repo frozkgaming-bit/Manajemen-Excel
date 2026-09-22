@@ -6,7 +6,7 @@ export function showProgress(title, percent = 0, text = "") {
     const textEl = document.getElementById('progressText');
 
     if (modal) {
-        modal.style.display = 'flex';
+        modal.style.display = 'block';
         if (titleEl) titleEl.innerText = title;
         if (barEl) barEl.style.width = `${percent}%`;
         if (textEl) textEl.innerText = text;
