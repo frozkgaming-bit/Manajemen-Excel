@@ -1,7 +1,7 @@
 export const SUPABASE_URL = 'https://pmoqzheinikyddkehbhd.supabase.co';
 export const SUPABASE_ANON_KEY = 'sb_publishable_3eeK9jTStOQM3JM3VP-VkA_swV4V3_b';
 export const TABLE_NAME = 'kwalitas_data_cimahi';
-export const BUCKET_NAME = 'cad-files';
+export const BUCKET_NAME = 'cad_files';
 
 export const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
