@@ -24,12 +24,12 @@ export function setHeaders(val) { headers = val; }
 
 export function setupHeadersIfNeeded() {
     const tableHead = document.getElementById('tableHead');
-    if (headers.length === 0) {
+    if (headers.length === 0 && tableHead) {
         headers = [...DB_COLUMNS];
-        let headerHtml = '<tr><th class="col-id">No ID</th>';
+        let headerHtml = '<tr><th class="py-3 px-3 text-center w-14" scope="col">No ID</th>';
         headers.forEach(function(header) {
             let headerTitle = header.replace(/_/g, ' ').toUpperCase();
-            headerHtml += `<th>${headerTitle}</th>`;
+            headerHtml += `<th class="py-3 px-4">${headerTitle}</th>`;
         });
         headerHtml += '</tr>';
         tableHead.innerHTML = headerHtml;
@@ -38,18 +38,10 @@ export function setupHeadersIfNeeded() {
 
 export function loadMoreData() {
     const tableBody = document.getElementById('tableBody');
-    const progressContainer = document.getElementById('progressContainer');
-    const progressBar = document.getElementById('progressBar');
-    const progressText = document.getElementById('progressText');
-
+    if (!tableBody) return;
+    
     if (currentIndex >= filteredData.length) return;
     
-    if (progressContainer) {
-        progressContainer.style.display = "block";
-        progressBar.style.width = "100%";
-        progressText.innerText = "Memuat data...";
-    }
-
     let endIndex = currentIndex + batchSize;
     if (endIndex > filteredData.length) {
         endIndex = filteredData.length;
@@ -61,56 +53,65 @@ export function loadMoreData() {
         let rowClass = "";
 
         if (row['keterangan'] && row['keterangan'].toLowerCase() === 'selesai') {
-            rowClass = "row-hijau"; 
+            rowClass = "bg-slate-50/30";
         }
         
-        rowsHtml += `<tr class="${rowClass}">`;
-        rowsHtml += `<td class="col-id" style="text-align: center;"><b>${i + 1}</b></td>`;
+        rowsHtml += `<tr class="hover:bg-slate-50/80 transition-colors ${rowClass}">`;
+        rowsHtml += `<td class="py-3 px-3 text-center font-semibold text-slate-900">${i + 1}</td>`;
         
         headers.forEach(function(header) {
-            rowsHtml += `<td>${row[header] !== undefined ? row[header] : ''}</td>`;
+            let cellValue = row[header] !== undefined && row[header] !== null ? row[header] : '';
+            let cellClass = '';
+            if (header === 'keterangan') {
+                if (cellValue.toLowerCase() === 'selesai') {
+                    cellClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                } else if (cellValue.toLowerCase() === 'belum selesai') {
+                    cellClass = 'bg-rose-50 text-rose-700 border-rose-200';
+                } else {
+                    cellClass = 'bg-slate-100 text-slate-600';
+                }
+                cellValue = cellValue.charAt(0).toUpperCase() + cellValue.slice(1).toLowerCase();
+            }
+            rowsHtml += `<td class="py-3 px-4">${cellValue}</td>`;
         });
         
         rowsHtml += '</tr>';
     }
 
-    tableBody.insertAdjacentHTML('beforeend', rowsHtml);
-    currentIndex = endIndex;
-    
-    if (progressContainer) {
-        progressContainer.style.display = "none";
+    const tableBody = document.getElementById('tableBody');
+    if (tableBody) {
+        tableBody.insertAdjacentHTML('beforeend', rowsHtml);
     }
+    currentIndex = endIndex;
 }
 
 export async function fetchPaginatedData() {
-    const progressContainer = document.getElementById('progressContainer');
-    const progressBar = document.getElementById('progressBar');
-    const progressText = document.getElementById('progressText');
+    const tableBody = document.getElementById('tableBody');
     const searchCategory = document.getElementById('searchCategory');
     const searchInput = document.getElementById('searchInput');
-    const tableBody = document.getElementById('tableBody');
     const filterSummary = document.getElementById('filterSummary');
     const countFiltered = document.getElementById('countFiltered');
+    const searchDisplay = document.getElementById('searchDisplay');
+    const pageStart = document.getElementById('pageStart');
+    const pageEnd = document.getElementById('pageEnd');
+    const totalRecords = document.getElementById('totalRecords');
 
     if (isPulling || !hasMorePullData) return;
     
     isPulling = true;
-    if (progressContainer) {
-        progressContainer.style.display = "block";
-        progressBar.style.width = "100%";
-        progressText.innerText = "Memuat data...";
-    }
     
     try {
         const limit = 50;
-        const from = (currentPullPage - 1) * limit;
-        const to = from + limit - 1;
+        const from = (currentPullPage - 1) * 50;
+        const to = from + 50 - 1;
         
         let query = supabaseClient.from(TABLE_NAME).select('*', { count: currentPullPage === 1 ? 'exact' : undefined }).order('id', { ascending: true }).range(from, to);
         
-        const searchTerm = searchInput ? searchInput.value.trim() : "";
+        const searchTerm = document.getElementById('searchInput')?.value?.trim() || "";
+        
         if (searchTerm !== "") {
-            const selectedCategory = searchCategory.value;
+            const selectedCategory = document.getElementById('searchCategory')?.value || 'all';
+            
             if (selectedCategory === 'all') {
                 const sanitizedTerm = searchTerm.replace(/[(),]/g, '');
                 const orFilter = DB_COLUMNS.map(col => `${col}.ilike.*${sanitizedTerm}*`).join(',');
@@ -125,10 +126,15 @@ export async function fetchPaginatedData() {
         
         if (currentPullPage === 1) {
             if (searchTerm !== "") {
+                const filterSummary = document.getElementById('filterSummary');
+                const countFiltered = document.getElementById('countFiltered');
                 if (filterSummary) filterSummary.style.display = "inline";
-                if (countFiltered) countFiltered.innerText = count !== null ? count : 0;
+                if (countFiltered) countFiltered.innerText = count !== null && count !== undefined ? count : 0;
+                if (searchDisplay) searchDisplay.textContent = searchTerm;
             } else {
+                const filterSummary = document.getElementById('filterSummary');
                 if (filterSummary) filterSummary.style.display = "none";
+                if (searchDisplay) searchDisplay.textContent = '-';
             }
         }
 
@@ -138,20 +144,30 @@ export async function fetchPaginatedData() {
             filteredData = [...allData];
             loadMoreData();
             
-            if (data.length < limit) hasMorePullData = false;
+            // Update pagination info
+            if (pageStart) pageStart.textContent = currentIndex - data.length + 1;
+            if (pageEnd) pageEnd.textContent = currentIndex;
+            if (totalRecords) totalRecords.textContent = count || filteredData.length;
+            
+            if (data.length < 50) hasMorePullData = false;
             else currentPullPage++;
         } else {
             hasMorePullData = false;
             if (currentPullPage === 1) {
-                if (searchTerm !== "" && countFiltered) countFiltered.innerText = "0";
-                tableBody.innerHTML = "<tr><td colspan='100%' style='text-align:center; padding: 15px;'>Data tidak ditemukan</td></tr>";
+                const tableBody = document.getElementById('tableBody');
+                if (tableBody) {
+                    tableBody.innerHTML = "<tr><td colspan='12' class='py-12 text-center text-slate-500'>Data tidak ditemukan</td></tr>";
+                }
+                if (searchTerm !== "") {
+                    const countFiltered = document.getElementById('countFiltered');
+                    if (countFiltered) countFiltered.innerText = "0";
+                }
             }
         }
     } catch (error) {
         console.error("Error fetching data:", error);
     } finally {
         isPulling = false;
-        if (progressContainer) progressContainer.style.display = "none";
     }
 }
 
@@ -165,13 +181,13 @@ export function resetPagination() {
     if (tableBody) tableBody.innerHTML = "";
     
     const searchInput = document.getElementById('searchInput');
+    if (searchInput) searchInput.value = "";
+    
+    // Reset filtered count display
     const filterSummary = document.getElementById('filterSummary');
     const countFiltered = document.getElementById('countFiltered');
-    if (searchInput && searchInput.value.trim() === "") {
-        if (filterSummary) filterSummary.style.display = "none";
-    } else if (countFiltered) {
-        countFiltered.innerText = "0";
-    }
+    if (filterSummary) filterSummary.style.display = "none";
+    if (countFiltered) countFiltered.innerText = 0;
 }
 
 export async function fetchAllDataConcurrently() {
@@ -180,69 +196,40 @@ export async function fetchAllDataConcurrently() {
     if (countError) { alert("Gagal menghitung total data: " + countError.message); return null; }
     if (count === 0) return [];
 
-    const totalPages = Math.ceil(count / limit);
+    const totalPages = Math.ceil(count / 1000);
     const maxConcurrent = 5;
-    const pagedData = new Array(totalPages);
+    const pagedData = new Array(Math.ceil(count / 1000));
     let currentPage = 0;
-    let completedPages = 0;
-
-    const progressContainer = document.getElementById('progressContainer');
-    const progressBar = document.getElementById('progressBar');
-    const progressText = document.getElementById('progressText');
-    
-    if (progressContainer) {
-        progressContainer.style.display = "block";
-        progressBar.style.width = "0%";
-        progressText.innerText = `Menarik 0 / ${totalPages} halaman data... (0%)`;
-    }
 
     const selectQuery = 'id,' + DB_COLUMNS.join(',');
 
     const fetchWorker = async () => {
-        while (currentPage < totalPages) {
+        while (currentPage < Math.ceil(count / 1000)) {
             const page = currentPage++; 
-            const from = page * limit;
-            const to = from + limit - 1;
-            const { data, error } = await supabaseClient.from(TABLE_NAME).select(selectQuery).order('id', { ascending: true }).range(from, to);
+            const from = page * 1000;
+            const to = from + 1000 - 1;
+            const { data, error } = await supabaseClient.from(TABLE_NAME).select('id,' + DB_COLUMNS.join(',')).order('id', { ascending: true }).range(from, to);
             if (error) throw error;
             pagedData[page] = data; 
-            completedPages++;
-
-            if (progressContainer) {
-                const percent = Math.round((completedPages / totalPages) * 100);
-                progressBar.style.width = `${percent}%`;
-                progressText.innerText = `Menarik ${completedPages} / ${totalPages} halaman data... (${percent}%)`;
-            }
         }
     };
 
-    const workers = Array.from({ length: Math.min(maxConcurrent, totalPages) }, () => fetchWorker());
-    try { 
-        await Promise.all(workers); 
-    } catch (error) { 
-        if (progressContainer) progressContainer.style.display = "none";
-        alert("Gagal mengekspor data: " + error.message); 
-        return null; 
-    }
-
-    if (progressContainer) {
-        setTimeout(() => {
-            progressContainer.style.display = "none";
-        }, 1000);
-    }
-    
+    const workers = Array.from({ length: Math.min(5, Math.ceil(count / 1000)) }, () => fetchWorker());
+    try { await Promise.all(workers); } catch (error) { alert("Gagal mengekspor data: " + error.message); return null; }
     return pagedData.flat();
 }
 
 export function initTableScroll() {
-    const scrollWrapper = document.getElementById('tableScrollWrapper');
-    scrollWrapper.addEventListener('scroll', function() {
-        if (scrollWrapper.scrollTop + scrollWrapper.clientHeight >= scrollWrapper.scrollHeight - 5) {
-            if (currentIndex < filteredData.length) {
-                loadMoreData();
-            } else {
-                fetchPaginatedData();
+    const scrollWrapper = document.querySelector('.overflow-x-auto');
+    if (scrollWrapper) {
+        scrollWrapper.addEventListener('scroll', function() {
+            if (scrollWrapper.scrollTop + scrollWrapper.clientHeight >= scrollWrapper.scrollHeight - 5) {
+                if (currentIndex < filteredData.length) {
+                    loadMoreData();
+                } else {
+                    fetchPaginatedData();
+                }
             }
-        }
-    });
+        });
+    }
 }

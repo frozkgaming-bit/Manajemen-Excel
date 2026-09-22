@@ -2,22 +2,25 @@ import { uploadDwgFile, listDwgFiles, getPublicUrl } from './storage.js';
 import { showProgress, updateProgress, hideProgress } from './progress.js';
 
 export function initStorageHandlers() {
-    const fileInput = document.getElementById('dwgFileInput');
+    const fileInputEl = document.getElementById('dwgFileInput');
     const uploadBtn = document.getElementById('uploadBtn');
     const statusDiv = document.getElementById('uploadStatus');
     const fileList = document.getElementById('dwgFileList');
+    const dwgFileName = document.getElementById('dwgFileName');
 
     // Handle file selection
-    const fileInputEl = document.getElementById('dwgFileInput');
     if (fileInputEl) {
         fileInputEl.addEventListener('change', function(e) {
             const file = e.target.files[0];
             const statusDiv = document.getElementById('uploadStatus');
+            const dwgFileNameEl = document.getElementById('dwgFileName');
             if (file) {
                 statusDiv.innerText = `File dipilih: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
                 statusDiv.style.color = '#333';
+                if (dwgFileNameEl) dwgFileNameEl.textContent = file.name;
             } else {
                 statusDiv.innerText = '';
+                if (dwgFileNameEl) dwgFileNameEl.textContent = 'No file chosen';
             }
         });
     }
@@ -45,22 +48,21 @@ export function initStorageHandlers() {
             showProgress("Mengunggah File DWG", 10, "Mengirim file ke Supabase Storage...");
 
             try {
-                const { publicUrl, fileName } = await uploadDwgFile(file, (percent) => {
-                    // Update progress if needed
-                });
+                const { publicUrl, fileName } = await uploadDwgFile(file);
 
                 statusDiv.innerText = `Sukses: ${file.name} berhasil diunggah`;
                 statusDiv.style.color = 'green';
-                document.getElementById('dwgFileInput').value = '';
+                if (fileInput) fileInput.value = '';
 
                 // Refresh file list
                 await loadFileList();
             } catch (err) {
                 console.error(err);
-                document.getElementById('uploadStatus').innerText = `Gagal: ${err.message}`;
-                document.getElementById('uploadStatus').style.color = 'red';
+                statusDiv.innerText = `Gagal: ${err.message}`;
+                statusDiv.style.color = 'red';
             } finally {
                 hideProgress();
+                uploadBtn.disabled = false;
             }
         });
     }

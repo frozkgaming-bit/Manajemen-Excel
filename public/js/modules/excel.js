@@ -11,7 +11,7 @@ function cleanSuratUkur(value) {
     return str;
 }
 
-export async function sendToBackendInChunks(dataArray, chunkSize = 5000) {
+export async function sendToBackendInChunks(dataArray, chunkSize = 10000) {
     if (!dataArray || dataArray.length === 0) return;
     
     let successCount = 0;
@@ -45,13 +45,16 @@ export async function sendToBackendInChunks(dataArray, chunkSize = 5000) {
         await new Promise(r => setTimeout(r, 10));
     }
 
+    const uploadMainEl = document.getElementById('fileUploadMain');
+    const uploadDoneEl = document.getElementById('fileUploadDone');
     if (uploadMain) uploadMain.disabled = false;
     if (uploadDone) uploadDone.disabled = false;
 
     updateProgress(100, `Selesai! Berhasil menyimpan ${successCount.toLocaleString('id-ID')} baris.`);
     setTimeout(() => {
         hideProgress();
-    }, 2500);
+        alert(`Selesai! Berhasil menyimpan ${successCount} dari ${total} baris ke database.`);
+    }, 500);
 
     fetchServerCounts();
 }
@@ -116,7 +119,7 @@ export function initExcelHandlers() {
 
                     loadMoreData();
                     fetchServerCounts();
-                    sendToBackendInChunks(cleanedNewData, 5000).finally(() => {
+                    sendToBackendInChunks(cleanedNewData, 10000).finally(() => {
                         hideProgress();
                     });
                     e.target.value = "";
@@ -158,15 +161,15 @@ export function initExcelHandlers() {
                     });
 
                     setupHeadersIfNeeded();
+
                     let headers = getHeaders();
                     let uniqueMap = new Map();
-
                     newData.forEach(item => {
                         item['keterangan'] = "Selesai";
                         let signature = headers.filter(header => header !== 'keterangan').map(header => (item[header] !== undefined && item[header] !== null ? item[header].toString().trim() : '')).join('__');
                         uniqueMap.set(signature, item);
                     });
-
+                    
                     let cleanedNewData = Array.from(uniqueMap.values());
                     let allData = getAllData();
                     let mapIndex = new Map();
@@ -185,19 +188,19 @@ export function initExcelHandlers() {
                             mapIndex.set(newSignature, allData.length - 1);
                         }
                     });
-
+                    
                     setAllData(allData);
                     const searchInput = document.getElementById('searchInput');
                     if (searchInput) searchInput.value = "";
                     setFilteredData([...allData]);
                     setCurrentIndex(0);
-
+                    
                     const tableBody = document.getElementById('tableBody');
                     if (tableBody) tableBody.innerHTML = "";
-
+                    
                     loadMoreData();
                     fetchServerCounts();
-                    sendToBackendInChunks(cleanedNewData, 5000).finally(() => {
+                    sendToBackendInChunks(cleanedNewData, 10000).finally(() => {
                         hideProgress();
                     });
                     e.target.value = "";
@@ -230,6 +233,7 @@ export function initExcelHandlers() {
                 }
 
                 const aoaData = [formattedHeaders];
+
                 for (let i = 0; i < allExportData.length; i++) {
                     const row = allExportData[i];
                     const rowArray = [i + 1];
@@ -254,4 +258,12 @@ export function initExcelHandlers() {
             }
         });
     }
+}
+
+function cleanSuratUkur(value) {
+    if (!value) return "";
+    const str = value.toString().trim();
+    const match = str.match(/^((?:SU|GS)?[.\s]?\d+)\/[^/]+\/(\d{4})$/i);
+    if (match) return `${match[1].trim()}/${match[2]}`;
+    return str;
 }

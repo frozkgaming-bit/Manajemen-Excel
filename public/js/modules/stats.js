@@ -11,9 +11,13 @@ export async function fetchServerCounts() {
             
         if (errTotal || errSelesai) throw errTotal || errSelesai;
 
-        document.getElementById('countTotal').innerText = total || 0;
-        document.getElementById('countSelesai').innerText = selesai || 0;
-        document.getElementById('countBelum').innerText = (total - selesai) || 0;
+        const countTotal = document.getElementById('countTotal');
+        const countSelesai = document.getElementById('countSelesai');
+        const countBelum = document.getElementById('countBelum');
+
+        if (countTotal) countTotal.textContent = total || 0;
+        if (countSelesai) countSelesai.textContent = selesai || 0;
+        if (countBelum) countBelum.textContent = (total - selesai) || 0;
     } catch (error) {
         console.error("Gagal mengambil jumlah data:", error);
     }
