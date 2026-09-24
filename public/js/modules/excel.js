@@ -63,7 +63,24 @@ export function initExcelHandlers() {
     if (fileUploadExcel) {
         fileUploadExcel.addEventListener('change', function(e) {
             var file = e.target.files[0];
-            if (!file) return;
+            var fileNameEl = document.getElementById('excelFileName');
+            if (file) {
+                if (fileNameEl) fileNameEl.textContent = file.name;
+            } else {
+                if (fileNameEl) fileNameEl.textContent = 'No file chosen';
+            }
+        });
+    }
+
+    const btnUploadExcel = document.getElementById('btnUploadExcel');
+    if (btnUploadExcel) {
+        btnUploadExcel.addEventListener('click', function() {
+            var fileInput = document.getElementById('fileUploadExcel');
+            var file = fileInput ? fileInput.files[0] : null;
+            if (!file) {
+                alert('Pilih file Excel terlebih dahulu.');
+                return;
+            }
 
             showProgress("Membaca File Excel", 15, "Sedang memproses file, mohon tunggu...");
 
@@ -130,12 +147,9 @@ export function initExcelHandlers() {
                     sendToBackendInChunks(cleanedNewData, 10000).finally(() => {
                         hideProgress();
                     });
-                    e.target.value = "";
                 };
                 reader.readAsArrayBuffer(file);
             }, 50);
-
-            e.target.value = "";
         });
     }
 
