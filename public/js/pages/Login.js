@@ -44,13 +44,6 @@ const render = () => {
                                 <input class="block w-full pl-10 pr-3.5 py-2.5 bg-slate-50/60 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder-slate-400 tracking-wider focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition-colors" id="loginPassword" name="password" placeholder="Masukkan password Anda" required="" type="password">
                             </div>
                         </div>
-                        <div class="flex items-center justify-between pt-1">
-                            <label class="flex items-center space-x-2 cursor-pointer">
-                                <input class="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-2 focus:ring-brand-500" id="rememberMe" name="rememberMe" type="checkbox">
-                                <span class="text-xs text-slate-600">Ingat saya</span>
-                            </label>
-                            <a href="#" class="text-xs font-medium text-brand-600 hover:text-brand-700 transition-colors">Lupa Password?</a>
-                        </div>
                         <button class="w-full mt-2 inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-lg text-white bg-brand-600 hover:bg-brand-700 active:bg-brand-800 shadow-md shadow-brand-500/25 hover:shadow-lg hover:shadow-brand-500/35 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:ring-offset-2 transition-all duration-200" id="btnLogin" type="submit">
                             <span class="">Masuk ke Sistem</span>
                             <svg class="w-4 h-4 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
@@ -59,16 +52,6 @@ const render = () => {
                         </button>
                     </form>
                     <div id="loginError" class="hidden mt-4 p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium" role="alert"></div>
-                    <div class="mt-6 pt-5 border-t border-slate-100 flex items-center justify-center gap-2 text-slate-400">
-                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.236 4.277a.75.75 0 01-1.06-1.06l2.5-3.062a.75.75 0 10-1.06-1.06l-3.5 3.5a.75.75 0 11-1.06-1.06l2.5-3.5a.75.75 0 00-1.06-1.06l-3 4a.75.75 0 01-1.06 0z" clip-rule="evenodd"></path>
-                        </svg>
-                        <span class="text-xs text-slate-500">Data terenkripsi & aman</span>
-                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 1.414L12.586 10l-2.293 2.293a1 1 0 101.414 1.414l3 3a1 1 0 001.414-1.414z" clip-rule="evenodd"></path>
-                        </svg>
-                        <span class="text-xs text-slate-500">Server Indonesia (ID)</span>
-                    </div>
                 </div>
             </div>
         </main>
