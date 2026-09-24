@@ -131,13 +131,20 @@ export function initExcelHandlers() {
 
     const btnUploadExcel = document.getElementById('btnUploadExcel');
     if (btnUploadExcel) {
+        let isUploading = false;
+
         btnUploadExcel.addEventListener('click', function() {
+            if (isUploading) return;
+
             var fileInput = document.getElementById('fileUploadExcel');
             var file = fileInput ? fileInput.files[0] : null;
             if (!file) {
                 alert('Pilih file Excel terlebih dahulu.');
                 return;
             }
+
+            isUploading = true;
+            btnUploadExcel.disabled = true;
 
             showProgress("Membaca File Excel", 10, "Sedang memproses file, mohon tunggu...");
 
@@ -153,6 +160,8 @@ export function initExcelHandlers() {
                     if (rawData.length === 0) { 
                         hideProgress();
                         alert("File kosong."); 
+                        isUploading = false;
+                        btnUploadExcel.disabled = false;
                         return; 
                     }
 
@@ -163,17 +172,24 @@ export function initExcelHandlers() {
 
                     setupHeadersIfNeeded();
                     let headers = getHeaders();
+                    const dataColumns = headers.filter(h => h !== 'keterangan');
                     let uniqueMap = new Map();
 
                     newData.forEach(item => {
-                        let signature = headers.map(header => (item[header] !== undefined && item[header] !== null ? item[header].toString().trim() : '')).join('__');
-                        uniqueMap.set(signature, item);
+                        let signature = dataColumns.map(col => (item[col] !== undefined && item[col] !== null ? item[col].toString().trim() : '')).join('__');
+                        if (!uniqueMap.has(signature)) {
+                            uniqueMap.set(signature, item);
+                        } else {
+                            const existing = uniqueMap.get(signature);
+                            if (item.keterangan && item.keterangan.toLowerCase() === 'selesai') {
+                                uniqueMap.set(signature, item);
+                            }
+                        }
                     });
 
                     let cleanedNewData = Array.from(uniqueMap.values());
 
                     updateProgress(30, "Memeriksa data 'Selesai' yang sudah ada...");
-                    const dataColumns = DB_COLUMNS.filter(c => c !== 'keterangan');
                     const selectCols = dataColumns.join(',');
                     const { data: existingSelesai } = await supabaseClient
                         .from(TABLE_NAME)
@@ -210,6 +226,8 @@ export function initExcelHandlers() {
                     if (toUpload.length === 0) {
                         hideProgress();
                         alert(`Tidak ada data baru untuk diunggah.\n${skippedCount} baris dilewati (sudah 'Selesai' di database).`);
+                        isUploading = false;
+                        btnUploadExcel.disabled = false;
                         return;
                     }
 
@@ -221,6 +239,8 @@ export function initExcelHandlers() {
                         alert(`Upload gagal: ${error.message}`);
                     } finally {
                         hideProgress();
+                        isUploading = false;
+                        btnUploadExcel.disabled = false;
                         resetPagination();
                         fetchServerCounts();
                         fetchPaginatedData();
