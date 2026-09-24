@@ -13,74 +13,71 @@ const render = () => {
         <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6" id="dashboardContent">
             <!-- BEGIN: DataManagementCards -->
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
-                <!-- Excel Import & Sync Card -->
-                <div class="lg:col-span-7 bg-white rounded-xl border border-slate-200/80 shadow-2xs p-5 flex flex-col justify-between">
+                <!-- Excel Import Card -->
+                <div class="lg:col-span-6 bg-white rounded-xl border border-slate-200/80 shadow-2xs p-5 flex flex-col justify-between">
                     <div>
                         <div class="flex items-center justify-between pb-3 border-b border-slate-100">
                             <h2 class="text-sm font-bold text-slate-900 flex items-center">
                                 <svg class="w-4 h-4 mr-2 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
                                 </svg>
-                                Sinkronisasi & Impor Data Excel
+                                Upload File Excel
                             </h2>
-                        <span class="text-[11px] font-medium text-slate-400">Format: .xlsx, .xls</span>
+                            <span class="text-[11px] font-medium text-slate-400">Format: .xlsx, .xls</span>
                         </div>
-                        <div class="mt-4 space-y-3.5">
-                            <div class="flex flex-col sm:flex-row sm:items-center justify-between text-xs gap-2">
-                                <label class="font-medium text-slate-700 min-w-44">Upload File Excel:</label>
-                                <div class="flex items-center w-full max-w-md bg-slate-50 border border-slate-200 rounded-lg p-1 focus-within:border-brand-500">
-                                    <label class="cursor-pointer bg-white border border-slate-200 text-slate-700 px-2.5 py-1 rounded text-xs font-medium hover:bg-slate-100 transition shadow-2xs shrink-0">
-                                        <span class="">Choose File</span>
-                                        <input class="hidden" type="file" id="fileUploadExcel" accept=".xlsx, .xls, .csv" />
-                                    </label>
-                                    <span class="ml-3 text-slate-600 text-xs truncate font-medium" id="excelFileName">No file chosen</span>
-                                </div>
+                        <div class="mt-4">
+                            <div class="flex items-center bg-slate-50 border border-slate-200 rounded-lg p-1.5">
+                                <label class="cursor-pointer bg-white border border-slate-200 text-slate-700 px-2.5 py-1 rounded text-xs font-medium hover:bg-slate-100 transition shadow-2xs shrink-0">
+                                    <span class="">Pilih File</span>
+                                    <input class="hidden" type="file" id="fileUploadExcel" accept=".xlsx, .xls, .csv" />
+                                </label>
+                                <span class="ml-3 text-slate-500 text-xs truncate" id="excelFileName">No file chosen</span>
                             </div>
                         </div>
                     </div>
-                    <div class="mt-5 pt-3 border-t border-slate-100 flex flex-wrap gap-2.5">
-                        <button id="btnUploadExcel" class="inline-flex items-center px-3.5 py-2 border border-transparent rounded-lg text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 focus:outline-hidden transition shadow-xs" type="button">
-                            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="mt-4 pt-3 border-t border-slate-100 flex gap-2.5">
+                        <button id="btnUploadExcel" class="flex-1 inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-lg text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 focus:outline-hidden transition shadow-xs" type="button">
+                            <svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
                             </svg>
                             Upload ke Database
                         </button>
-                        <button id="btnPrint" class="inline-flex items-center px-3.5 py-2 border border-transparent rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-hidden transition shadow-xs" type="button">
-                            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <button id="btnPrint" class="flex-1 inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-hidden transition shadow-xs" type="button">
+                            <svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
                             </svg>
                             Export ke Excel
                         </button>
                     </div>
                 </div>
-            <!-- AutoCAD (.dwg) Integration Card -->
-                <div class="lg:col-span-5 bg-white rounded-xl border border-slate-200/80 shadow-2xs p-5 flex flex-col justify-between">
+                <!-- DWG Upload Card -->
+                <div class="lg:col-span-6 bg-white rounded-xl border border-slate-200/80 shadow-2xs p-5 flex flex-col justify-between">
                     <div>
                         <div class="flex items-center justify-between pb-3 border-b border-slate-100">
                             <h2 class="text-sm font-bold text-slate-900 flex items-center">
                                 <svg class="w-4 h-4 mr-2 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
                                 </svg>
-                                Upload File AutoCAD (.dwg)
+                                Upload File DWG
                             </h2>
-                            <span class="text-[11px] font-medium text-slate-400">Peta Kadastral</span>
+                            <span class="text-[11px] font-medium text-slate-400">Format: .dwg</span>
                         </div>
-                        <div class="mt-4 space-y-3">
+                        <div class="mt-4">
                             <div class="flex items-center bg-slate-50 border border-slate-200 rounded-lg p-1.5">
                                 <label class="cursor-pointer bg-white border border-slate-200 text-slate-700 px-2.5 py-1 rounded text-xs font-medium hover:bg-slate-100 transition shadow-2xs shrink-0">
-                                    <span class="">Choose File</span>
+                                    <span class="">Pilih File</span>
                                     <input class="hidden" type="file" id="dwgFileInput" accept=".dwg" />
                                 </label>
                                 <span class="ml-3 text-slate-500 text-xs truncate" id="dwgFileName">No file chosen</span>
                             </div>
                         </div>
                     </div>
-                    <div class="mt-4 pt-3 border-t border-slate-100 flex justify-end">
-                        <button id="uploadBtn" class="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-lg text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700 focus:outline-hidden transition shadow-xs" type="button">
+                    <div class="mt-4 pt-3 border-t border-slate-100 flex gap-2.5">
+                        <button id="uploadBtn" class="flex-1 inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-lg text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700 focus:outline-hidden transition shadow-xs" type="button">
                             <svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+                                <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
                             </svg>
-                            Unggah ke Database
+                            Upload ke Database
                         </button>
                     </div>
                 </div>

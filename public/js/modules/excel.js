@@ -37,6 +37,12 @@ function normalizeExcelRow(row) {
 
 export async function sendToBackendInChunks(dataArray, chunkSize = 10000) {
     if (!dataArray || dataArray.length === 0) return;
+
+    const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
+    if (sessionError) throw new Error(`Gagal memeriksa sesi login: ${sessionError.message}`);
+    if (!session) {
+        throw new Error('Sesi login sudah berakhir. Silakan login kembali.');
+    }
     
     let successCount = 0;
     const total = dataArray.length;
@@ -61,6 +67,7 @@ export async function sendToBackendInChunks(dataArray, chunkSize = 10000) {
         if (error) {
             console.error(`Gagal batch ${i + 1}:`, error.message);
             errors.push(`Batch ${i + 1}: ${error.message}`);
+            break;
         } else {
             successCount += chunk.length;
         }
