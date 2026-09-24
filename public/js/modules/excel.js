@@ -13,6 +13,28 @@ function cleanSuratUkur(value) {
 
 const ON_CONFLICT_COLUMNS = DB_COLUMNS.filter(c => c !== 'keterangan').join(',');
 
+function normalizeHeader(header) {
+    return header
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replace(/[\s-]+/g, '_');
+}
+
+function normalizeExcelRow(row) {
+    const normalizedRow = {};
+
+    Object.entries(row).forEach(([key, value]) => {
+        const normalizedKey = normalizeHeader(key);
+        if (DB_COLUMNS.includes(normalizedKey)) {
+            normalizedRow[normalizedKey] = value;
+        }
+    });
+
+    if (!normalizedRow.keterangan) normalizedRow.keterangan = 'Belum Selesai';
+    return normalizedRow;
+}
+
 export async function sendToBackendInChunks(dataArray, chunkSize = 10000) {
     if (!dataArray || dataArray.length === 0) return;
     
@@ -22,9 +44,12 @@ export async function sendToBackendInChunks(dataArray, chunkSize = 10000) {
     showProgress("Mengunggah Data ke Database", 0, `0 / ${total.toLocaleString('id-ID')} baris (0%)`);
 
     const fileInput = document.getElementById('fileUploadExcel');
+    const uploadButton = document.getElementById('btnUploadExcel');
     if (fileInput) fileInput.disabled = true;
+    if (uploadButton) uploadButton.disabled = true;
 
     const totalChunks = Math.ceil(total / chunkSize);
+    const errors = [];
     for (let i = 0; i < totalChunks; i++) {
         const from = i * chunkSize;
         const chunk = dataArray.slice(from, from + chunkSize);
@@ -35,6 +60,7 @@ export async function sendToBackendInChunks(dataArray, chunkSize = 10000) {
 
         if (error) {
             console.error(`Gagal batch ${i + 1}:`, error.message);
+            errors.push(`Batch ${i + 1}: ${error.message}`);
         } else {
             successCount += chunk.length;
         }
@@ -46,6 +72,11 @@ export async function sendToBackendInChunks(dataArray, chunkSize = 10000) {
     }
 
     if (fileInput) fileInput.disabled = false;
+    if (uploadButton) uploadButton.disabled = false;
+
+    if (errors.length > 0) {
+        throw new Error(`Gagal mengunggah ${errors.length} batch. ${errors[0]}`);
+    }
 
     updateProgress(100, `Selesai! Berhasil menyimpan ${successCount.toLocaleString('id-ID')} baris.`);
     setTimeout(() => {
@@ -82,11 +113,11 @@ export function initExcelHandlers() {
                 return;
             }
 
-            showProgress("Membaca File Excel", 15, "Sedang memproses file, mohon tunggu...");
+            showProgress("Membaca File Excel", 10, "Sedang memproses file, mohon tunggu...");
 
             setTimeout(() => {
                 var reader = new FileReader();
-                reader.onload = function(e) {
+                reader.onload = async function(e) {
                     var data = new Uint8Array(e.target.result);
                     var workbook = XLSX.read(data, {type: 'array'});
                     var firstSheetName = workbook.SheetNames[0];
@@ -99,12 +130,9 @@ export function initExcelHandlers() {
                         return; 
                     }
 
-                    var newData = rawData.map(function(row) {
-                        var lowerRow = {};
-                        for (var key in row) lowerRow[key.toLowerCase()] = row[key];
-                        if (lowerRow['surat_ukur']) lowerRow['surat_ukur'] = cleanSuratUkur(lowerRow['surat_ukur']);
-                        if (!lowerRow['keterangan']) lowerRow['keterangan'] = 'Belum Selesai';
-                        return lowerRow;
+                    var newData = rawData.map(normalizeExcelRow);
+                    newData.forEach(row => {
+                        if (row.surat_ukur) row.surat_ukur = cleanSuratUkur(row.surat_ukur);
                     });
 
                     setupHeadersIfNeeded();
@@ -118,12 +146,59 @@ export function initExcelHandlers() {
 
                     let cleanedNewData = Array.from(uniqueMap.values());
 
-                    sendToBackendInChunks(cleanedNewData, 10000).finally(() => {
+                    updateProgress(30, "Memeriksa data 'Selesai' yang sudah ada...");
+                    const dataColumns = DB_COLUMNS.filter(c => c !== 'keterangan');
+                    const selectCols = dataColumns.join(',');
+                    const { data: existingSelesai } = await supabaseClient
+                        .from(TABLE_NAME)
+                        .select(selectCols)
+                        .eq('keterangan', 'Selesai');
+
+                    const selesaiSignatures = new Set();
+                    if (existingSelesai && existingSelesai.length > 0) {
+                        existingSelesai.forEach(row => {
+                            let sig = dataColumns.map(col => (row[col] !== undefined && row[col] !== null ? row[col].toString().trim() : '')).join('__');
+                            selesaiSignatures.add(sig);
+                        });
+                    }
+
+                    updateProgress(50, `Menyaring data... ${selesaiSignatures.size} data 'Selesai' sudah ada di database.`);
+
+                    const toUpload = [];
+                    let skippedCount = 0;
+                    cleanedNewData.forEach(item => {
+                        let dataSig = dataColumns.map(col => (item[col] !== undefined && item[col] !== null ? item[col].toString().trim() : '')).join('__');
+                        if (item.keterangan && item.keterangan.toLowerCase() === 'selesai') {
+                            toUpload.push(item);
+                        } else if (selesaiSignatures.has(dataSig)) {
+                            skippedCount++;
+                        } else {
+                            toUpload.push(item);
+                        }
+                    });
+
+                    if (skippedCount > 0) {
+                        updateProgress(60, `Dilewati: ${skippedCount} baris sudah 'Selesai' di database.`);
+                    }
+
+                    if (toUpload.length === 0) {
+                        hideProgress();
+                        alert(`Tidak ada data baru untuk diunggah.\n${skippedCount} baris dilewati (sudah 'Selesai' di database).`);
+                        return;
+                    }
+
+                    try {
+                        await sendToBackendInChunks(toUpload, 10000);
+                    } catch (error) {
+                        console.error('Gagal mengunggah data Excel:', error);
+                        hideProgress();
+                        alert(`Upload gagal: ${error.message}`);
+                    } finally {
                         hideProgress();
                         resetPagination();
                         fetchServerCounts();
                         fetchPaginatedData();
-                    });
+                    }
                 };
                 reader.readAsArrayBuffer(file);
             }, 50);
