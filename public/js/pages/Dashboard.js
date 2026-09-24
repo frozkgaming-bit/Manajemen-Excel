@@ -33,6 +33,7 @@ const render = () => {
                                 </label>
                                 <span class="ml-3 text-slate-500 text-xs truncate" id="excelFileName">No file chosen</span>
                             </div>
+                            <div id="excelUploadToast" class="hidden mt-3 flex items-center gap-2 p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium"></div>
                         </div>
                     </div>
                     <div class="mt-4 pt-3 border-t border-slate-100 flex gap-2.5">
@@ -70,6 +71,7 @@ const render = () => {
                                 </label>
                                 <span class="ml-3 text-slate-500 text-xs truncate" id="dwgFileName">No file chosen</span>
                             </div>
+                            <div id="dwgUploadToast" class="hidden mt-3 flex items-center gap-2 p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium"></div>
                         </div>
                     </div>
                     <div class="mt-4 pt-3 border-t border-slate-100 flex gap-2.5">
