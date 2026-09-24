@@ -74,7 +74,7 @@ export function loadMoreData() {
                 }
                 cellValue = cellValue.charAt(0).toUpperCase() + cellValue.slice(1).toLowerCase();
             }
-            rowsHtml += `<td class="py-3 px-4">${cellValue}</td>`;
+            rowsHtml += `<td class="py-3 px-4 ${cellClass}">${cellValue}</td>`;
         });
         
         rowsHtml += '</tr>';
@@ -157,7 +157,7 @@ export async function fetchPaginatedData() {
             if (currentPullPage === 1) {
                 const tableBody = document.getElementById('tableBody');
                 if (tableBody) {
-                    tableBody.innerHTML = "<tr><td colspan='12' class='py-12 text-center text-slate-500'>Data tidak ditemukan</td></tr>";
+                    tableBody.innerHTML = `<tr><td colspan="${headers.length + 1}" class="py-12 text-center text-slate-500">Data tidak ditemukan</td></tr>`;
                 }
                 if (searchTerm !== "") {
                     const countFiltered = document.getElementById('countFiltered');
@@ -180,9 +180,6 @@ export function resetPagination() {
     currentIndex = 0;
     const tableBody = document.getElementById('tableBody');
     if (tableBody) tableBody.innerHTML = "";
-    
-    const searchInput = document.getElementById('searchInput');
-    if (searchInput) searchInput.value = "";
     
     // Reset filtered count display
     const filterSummary = document.getElementById('filterSummary');

@@ -19,6 +19,10 @@ export async function router() {
         window.location.hash = '#/login';
         return;
     }
+    if (session && hash === '#/login') {
+        window.location.hash = '#/dashboard';
+        return;
+    }
     if (appContainer) {
         const pageComponent = routes[hash] || NotFound;
 

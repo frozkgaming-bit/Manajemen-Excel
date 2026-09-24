@@ -164,20 +164,7 @@ const render = () => {
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-xs text-slate-600 border-collapse" id="dataTable">
-                        <thead class="bg-slate-100 text-slate-700 font-semibold uppercase tracking-wider text-[11px] border-b border-slate-200">
-                            <tr>
-                                <th class="py-3 px-3 text-center w-14" scope="col">No ID</th>
-                                <th class="py-3 px-4" scope="col">Kelurahan</th>
-                                <th class="py-3 px-4" scope="col">Nomor Hak</th>
-                                <th class="py-3 px-4" scope="col">Surat Ukur</th>
-                                <th class="py-3 px-3" scope="col">NIB</th>
-                                <th class="py-3 px-3 text-right" scope="col">Luas</th>
-                                <th class="py-3 px-3 text-center" scope="col">Produk</th>
-                                <th class="py-3 px-3 text-right" scope="col">Luas Peta</th>
-                                <th class="py-3 px-3 text-center" scope="col">Validator Tekstual</th>
-                                <th class="py-3 px-3 text-center" scope="col">Validator Yuridis</th>
-                                <th class="py-3 px-3 text-center" scope="col">Status</th>
-                            </tr>
+                        <thead class="bg-slate-100 text-slate-700 font-semibold uppercase tracking-wider text-[11px] border-b border-slate-200" id="tableHead">
                         </thead>
                         <tbody id="tableBody" class="divide-y divide-slate-100">
                         </tbody>
