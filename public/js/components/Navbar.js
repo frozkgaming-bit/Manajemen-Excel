@@ -5,19 +5,17 @@ export default function Navbar({ onLogout } = {}) {
                 <!-- Brand Logo and App Status -->
                 <div class="flex items-center space-x-4">
                     <div class="flex-shrink-0 flex items-center">
-                        <svg class="h-9 w-auto" fill="none" viewBox="0 0 200 48" xmlns="http://www.w3.org/2000/svg">
-                            <rect fill="#2563EB" height="36" rx="10" width="36" x="2" y="6"></rect>
-                            <path d="M12 24L18 16H28L22 24L28 32H18L12 24Z" fill="white" fill-opacity="0.9"></path>
-                            <circle cx="20" cy="24" fill="#60A5FA" r="3"></circle>
-                            <text fill="#0F172A" font-family="'Plus Jakarta Sans', sans-serif" font-size="18" font-weight="700" letter-spacing="-0.5" x="48" y="27">BOS <tspan fill="#2563EB">EDS</tspan></text>
-                            <text fill="#64748B" font-family="'Plus Jakarta Sans', sans-serif" font-size="9" font-weight="600" letter-spacing="1.2" x="48" y="38">SISTEM DATA PERTANAHAN</text>
+                        <svg class="h-9 w-auto" fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                            <rect fill="#2563EB" height="36" rx="10" width="36" x="6" y="6"></rect>
+                            <path d="M18 18L24 12H34L28 18L34 24H24L18 18Z" fill="white" fill-opacity="0.9"></path>
+                            <circle cx="26" cy="18" fill="#60A5FA" r="3"></circle>
                         </svg>
                     </div>
                     <div class="hidden md:flex items-center space-x-2 pl-4 border-l border-slate-200">
-                        <h1 class="text-sm font-semibold text-slate-800 tracking-tight">DATA EXCEL BOS EDS</h1>
+                        <h1 class="text-sm font-semibold text-slate-800 tracking-tight">Sistem Manajemen Data Excel</h1>
                         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
                             <span class="w-1.5 h-1.5 mr-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
-                            Online Database
+                            Online
                         </span>
                     </div>
                 </div>

@@ -7,18 +7,16 @@ const render = () => {
             <div class="w-full max-w-[440px]" data-purpose="login-card-wrapper">
                 <div class="bg-white/95 backdrop-blur-sm rounded-2xl border border-slate-200/90 shadow-[0_20px_50px_rgba(15,23,42,0.08)] p-8 sm:p-10 transition-all duration-300 hover:shadow-[0_24px_60px_rgba(15,23,42,0.12)]">
                     <header class="flex flex-col items-center text-center mb-8">
-                        <div class="mb-5 flex justify-center items-center h-12" data-purpose="brand-logo">
-                            <svg aria-label="BOS EDS Logo" class="h-10 w-auto" fill="none" role="img" viewBox="0 0 200 48" xmlns="http://www.w3.org/2000/svg">
-                                <rect fill="#2563EB" height="36" rx="10" width="36" x="2" y="6"></rect>
-                                <path d="M12 24L18 16H28L22 24L28 32H18L12 24Z" fill="white" fill-opacity="0.9"></path>
-                                <circle cx="20" cy="24" fill="#60A5FA" r="3"></circle>
-                                <text fill="#0F172A" font-family="'Plus Jakarta Sans', sans-serif" font-size="18" font-weight="700" letter-spacing="-0.5" x="48" y="27">BOS <tspan fill="#2563EB">EDS</tspan></text>
-                                <text fill="#64748B" font-family="'Plus Jakarta Sans', sans-serif" font-size="9" font-weight="600" letter-spacing="1.2" x="48" y="38">SISTEM DATA PERTANAHAN</text>
+                        <div class="mb-5 flex justify-center items-center h-12">
+                            <svg class="h-10 w-auto" fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                                <rect fill="#2563EB" height="36" rx="10" width="36" x="6" y="6"></rect>
+                                <path d="M18 18L24 12H34L28 18L34 24H24L18 18Z" fill="white" fill-opacity="0.9"></path>
+                                <circle cx="26" cy="18" fill="#60A5FA" r="3"></circle>
                             </svg>
                         </div>
-                        <h1 class="text-2xl font-bold tracking-tight text-slate-900 mb-1.5">Login Sistem</h1>
+                        <h1 class="text-2xl font-bold tracking-tight text-slate-900 mb-1.5">Sistem Manajemen Data Excel</h1>
                         <p class="text-xs text-slate-500 max-w-xs leading-relaxed">
-                            Silakan masuk untuk mengakses Sistem Data Pertanahan BOS EDS
+                            Silakan masuk untuk mengakses sistem
                         </p>
                     </header>
                     <form action="#" class="space-y-5" method="POST" id="loginForm">
