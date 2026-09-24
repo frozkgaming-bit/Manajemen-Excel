@@ -11,7 +11,7 @@ function cleanSuratUkur(value) {
     return str;
 }
 
-const ON_CONFLICT_COLUMNS = [...DB_COLUMNS].join(',');
+const ON_CONFLICT_COLUMNS = DB_COLUMNS.filter(c => c !== 'keterangan').join(',');
 
 export async function sendToBackendInChunks(dataArray, chunkSize = 10000) {
     if (!dataArray || dataArray.length === 0) return;
