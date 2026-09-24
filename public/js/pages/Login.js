@@ -8,10 +8,15 @@ const render = () => {
                 <div class="bg-white/95 backdrop-blur-sm rounded-2xl border border-slate-200/90 shadow-[0_20px_50px_rgba(15,23,42,0.08)] p-8 sm:p-10 transition-all duration-300 hover:shadow-[0_24px_60px_rgba(15,23,42,0.12)]">
                     <header class="flex flex-col items-center text-center mb-8">
                         <div class="mb-5 flex justify-center items-center h-12">
-                            <svg class="h-10 w-auto" fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-                                <rect fill="#2563EB" height="36" rx="10" width="36" x="6" y="6"></rect>
-                                <path d="M18 18L24 12H34L28 18L34 24H24L18 18Z" fill="white" fill-opacity="0.9"></path>
-                                <circle cx="26" cy="18" fill="#60A5FA" r="3"></circle>
+                            <svg class="h-12 w-12" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <rect width="48" height="48" rx="12" fill="#16A34A"/>
+                                <rect x="12" y="9" width="24" height="30" rx="2.5" fill="white" fill-opacity="0.9"/>
+                                <line x1="12" y1="16" x2="36" y2="16" stroke="#16A34A" stroke-width="1.5"/>
+                                <line x1="12" y1="23" x2="36" y2="23" stroke="#16A34A" stroke-width="1.5"/>
+                                <line x1="12" y1="30" x2="36" y2="30" stroke="#16A34A" stroke-width="1.5"/>
+                                <line x1="20" y1="9" x2="20" y2="39" stroke="#16A34A" stroke-width="1.5"/>
+                                <line x1="28" y1="9" x2="28" y2="39" stroke="#16A34A" stroke-width="1.5"/>
+                                <text x="13" y="14" fill="#16A34A" font-size="4.5" font-weight="700" font-family="sans-serif">A1</text>
                             </svg>
                         </div>
                         <h1 class="text-2xl font-bold tracking-tight text-slate-900 mb-1.5">Sistem Manajemen Data Excel</h1>

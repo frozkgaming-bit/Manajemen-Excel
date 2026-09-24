@@ -5,10 +5,15 @@ export default function Navbar({ onLogout } = {}) {
                 <!-- Brand Logo and App Status -->
                 <div class="flex items-center space-x-4">
                     <div class="flex-shrink-0 flex items-center">
-                        <svg class="h-9 w-auto" fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-                            <rect fill="#2563EB" height="36" rx="10" width="36" x="6" y="6"></rect>
-                            <path d="M18 18L24 12H34L28 18L34 24H24L18 18Z" fill="white" fill-opacity="0.9"></path>
-                            <circle cx="26" cy="18" fill="#60A5FA" r="3"></circle>
+                        <svg class="h-9 w-9" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect width="40" height="40" rx="10" fill="#16A34A"/>
+                            <rect x="10" y="8" width="20" height="24" rx="2" fill="white" fill-opacity="0.9"/>
+                            <line x1="10" y1="14" x2="30" y2="14" stroke="#16A34A" stroke-width="1.2"/>
+                            <line x1="10" y1="20" x2="30" y2="20" stroke="#16A34A" stroke-width="1.2"/>
+                            <line x1="10" y1="26" x2="30" y2="26" stroke="#16A34A" stroke-width="1.2"/>
+                            <line x1="17" y1="8" x2="17" y2="32" stroke="#16A34A" stroke-width="1.2"/>
+                            <line x1="24" y1="8" x2="24" y2="32" stroke="#16A34A" stroke-width="1.2"/>
+                            <text x="11" y="12.5" fill="#16A34A" font-size="3.5" font-weight="700" font-family="sans-serif">A1</text>
                         </svg>
                     </div>
                     <div class="hidden md:flex items-center space-x-2 pl-4 border-l border-slate-200">
