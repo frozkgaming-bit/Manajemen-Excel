@@ -30,7 +30,7 @@ const render = () => {
                                         <path d="M15.75 6a3.75 3.75 0 11-7.0 0 3.75 3.75 0 017.0 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" stroke-linecap="round" stroke-linejoin="round"></path>
                                     </svg>
                                 </div>
-                                <input class="block w-full pl-10 pr-3.5 py-2.5 bg-slate-50/60 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder-slate-400 font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition-colors" id="loginUsername" name="username" placeholder="Masukkan username Anda" required="" type="text" value="admin">
+                                <input class="block w-full pl-10 pr-3.5 py-2.5 bg-slate-50/60 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder-slate-400 font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition-colors" id="loginUsername" name="username" placeholder="Masukkan username Anda" required="" type="text">
                             </div>
                         </div>
                         <div data-purpose="input-group-password">
@@ -41,7 +41,7 @@ const render = () => {
                                         <path d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" stroke-linecap="round" stroke-linejoin="round"></path>
                                     </svg>
                                 </div>
-                                <input class="block w-full pl-10 pr-3.5 py-2.5 bg-slate-50/60 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder-slate-400 tracking-wider focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition-colors" id="loginPassword" name="password" placeholder="Masukkan password Anda" required="" type="password" value="admin123">
+                                <input class="block w-full pl-10 pr-3.5 py-2.5 bg-slate-50/60 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder-slate-400 tracking-wider focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition-colors" id="loginPassword" name="password" placeholder="Masukkan password Anda" required="" type="password">
                             </div>
                         </div>
                         <div class="flex items-center justify-between pt-1">
