@@ -11,11 +11,25 @@ export async function initStorageHandlers() {
         fileInputEl.addEventListener('change', function(e) {
             const file = e.target.files[0];
             const dwgFileNameEl = document.getElementById('dwgFileName');
+            const clearBtn = document.getElementById('clearDwgFile');
             if (file) {
                 if (dwgFileNameEl) dwgFileNameEl.textContent = file.name;
+                if (clearBtn) clearBtn.classList.remove('hidden');
             } else {
                 if (dwgFileNameEl) dwgFileNameEl.textContent = 'No file chosen';
+                if (clearBtn) clearBtn.classList.add('hidden');
             }
+        });
+    }
+
+    var clearDwgBtn = document.getElementById('clearDwgFile');
+    if (clearDwgBtn) {
+        clearDwgBtn.addEventListener('click', function() {
+            var fileInput = document.getElementById('dwgFileInput');
+            var fileNameEl = document.getElementById('dwgFileName');
+            if (fileInput) fileInput.value = '';
+            if (fileNameEl) fileNameEl.textContent = 'No file chosen';
+            this.classList.add('hidden');
         });
     }
 

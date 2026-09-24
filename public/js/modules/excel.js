@@ -107,11 +107,25 @@ export function initExcelHandlers() {
         fileUploadExcel.addEventListener('change', function(e) {
             var file = e.target.files[0];
             var fileNameEl = document.getElementById('excelFileName');
+            var clearBtn = document.getElementById('clearExcelFile');
             if (file) {
                 if (fileNameEl) fileNameEl.textContent = file.name;
+                if (clearBtn) clearBtn.classList.remove('hidden');
             } else {
                 if (fileNameEl) fileNameEl.textContent = 'No file chosen';
+                if (clearBtn) clearBtn.classList.add('hidden');
             }
+        });
+    }
+
+    var clearExcelBtn = document.getElementById('clearExcelFile');
+    if (clearExcelBtn) {
+        clearExcelBtn.addEventListener('click', function() {
+            var fileInput = document.getElementById('fileUploadExcel');
+            var fileNameEl = document.getElementById('excelFileName');
+            if (fileInput) fileInput.value = '';
+            if (fileNameEl) fileNameEl.textContent = 'No file chosen';
+            this.classList.add('hidden');
         });
     }
 

@@ -31,7 +31,10 @@ const render = () => {
                                     <span class="">Pilih File</span>
                                     <input class="hidden" type="file" id="fileUploadExcel" accept=".xlsx, .xls, .csv" />
                                 </label>
-                                <span class="ml-3 text-slate-500 text-xs truncate" id="excelFileName">No file chosen</span>
+                                <span class="ml-3 text-slate-500 text-xs truncate flex-1" id="excelFileName">No file chosen</span>
+                                <button type="button" id="clearExcelFile" class="hidden ml-1 p-0.5 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition shrink-0">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                </button>
                             </div>
                             <div id="excelUploadToast" class="hidden mt-3 flex items-center gap-2 p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium"></div>
                         </div>
@@ -69,7 +72,10 @@ const render = () => {
                                     <span class="">Pilih File</span>
                                     <input class="hidden" type="file" id="dwgFileInput" accept=".dwg" />
                                 </label>
-                                <span class="ml-3 text-slate-500 text-xs truncate" id="dwgFileName">No file chosen</span>
+                                <span class="ml-3 text-slate-500 text-xs truncate flex-1" id="dwgFileName">No file chosen</span>
+                                <button type="button" id="clearDwgFile" class="hidden ml-1 p-0.5 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition shrink-0">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                </button>
                             </div>
                             <div id="dwgUploadToast" class="hidden mt-3 flex items-center gap-2 p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium"></div>
                         </div>
