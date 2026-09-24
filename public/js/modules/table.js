@@ -59,7 +59,7 @@ export function loadMoreData() {
             rowClass = "bg-emerald-50 text-emerald-700";
         }
         
-        rowsHtml += `<tr class="hover:bg-slate-50/80 transition-colors ${rowClass}">`;
+        rowsHtml += `<tr class="group hover:bg-slate-50/80 transition-colors ${rowClass}">`;
         rowsHtml += `<td class="py-3 px-3 text-center font-semibold text-slate-900">${i + 1}</td>`;
         
         headers.forEach(function(header) {
@@ -67,11 +67,11 @@ export function loadMoreData() {
             let cellClass = '';
             if (header === 'keterangan') {
                 if (cellValue.toLowerCase() === 'selesai') {
-                    cellClass = 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100';
+                    cellClass = 'bg-emerald-50 text-emerald-700 border-emerald-200 group-hover:bg-emerald-100';
                 } else if (cellValue.toLowerCase() === 'belum selesai') {
-                    cellClass = 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100';
+                    cellClass = 'bg-rose-50 text-rose-700 border-rose-200 group-hover:bg-rose-100';
                 } else {
-                    cellClass = 'bg-slate-100 text-slate-600 hover:bg-slate-200';
+                    cellClass = 'bg-slate-100 text-slate-600 group-hover:bg-slate-200';
                 }
                 cellValue = cellValue.charAt(0).toUpperCase() + cellValue.slice(1).toLowerCase();
             }
@@ -273,8 +273,8 @@ export function initKeteranganHandlers() {
                 const displayVal = newStatus.charAt(0).toUpperCase() + newStatus.slice(1).toLowerCase();
                 keteranganTd.textContent = displayVal;
                 keteranganTd.className = 'py-3 px-4 ' + (newStatus === 'Selesai'
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-                    : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100');
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200 group-hover:bg-emerald-100'
+                    : 'bg-rose-50 text-rose-700 border-rose-200 group-hover:bg-rose-100');
             }
 
             if (newStatus === 'Selesai') {
