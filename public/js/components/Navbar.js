@@ -1,4 +1,4 @@
-export default function Navbar({ onLogout }) {
+export default function Navbar({ onLogout } = {}) {
     return `
         <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">

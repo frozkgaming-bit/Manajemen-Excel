@@ -41,15 +41,26 @@
     <main id="app"></main>
     <div id="footer-container"></div>
 
-    <div id="progressModal" style="display: none; position: fixed; bottom: 24px; right: 24px; z-index: 9999; max-width: 380px; width: calc(100% - 48px); pointer-events: auto;">
-        <div style="background: #ffffff; padding: 16px 20px; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.18); border: 1px solid #dcdfe6;">
-            <h4 id="progressTitle" style="margin: 0 0 8px; font-size: 14px; font-weight: 600; color: #2c3e50;">Memproses Data...</h4>
-            <div style="width: 100%; background-color: #ebeef5; border-radius: 6px; overflow: hidden; height: 12px; margin-bottom: 8px;">
-                <div id="progressBar" style="width: 0%; height: 100%; background-color: #28a745; transition: width 0.2s ease;"></div>
+    <aside id="progressModal" class="fixed bottom-5 right-5 z-40 max-w-sm w-full bg-white border border-slate-200 rounded-xl shadow-lg p-4 transition-all duration-300" style="display: none;">
+        <div class="flex items-center justify-between pb-2 border-b border-slate-100 mb-2.5">
+            <div class="flex items-center space-x-2">
+                <span class="flex h-2 w-2 relative">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-brand-600"></span>
+                </span>
+                <h4 id="progressTitle" class="text-xs font-bold text-slate-800">Memproses Data...</h4>
             </div>
-            <div id="progressText" style="font-size: 12px; font-weight: 500; color: #606266; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Menyiapkan data...</div>
         </div>
-    </div>
+        <div class="space-y-1.5">
+            <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                <div id="progressBar" class="bg-brand-600 h-2 rounded-full transition-all duration-500 ease-out" style="width: 0%;"></div>
+            </div>
+            <div class="flex items-center justify-between text-[11px] text-slate-500">
+                <span id="progressText" class="">Menyiapkan data...</span>
+                <span id="progressPercent" class="font-semibold text-brand-600">0%</span>
+            </div>
+        </div>
+    </aside>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>

@@ -23,9 +23,11 @@ export function setCurrentIndex(val) { currentIndex = val; }
 export function setHeaders(val) { headers = val; }
 
 export function setupHeadersIfNeeded() {
-    const tableHead = document.getElementById('tableHead');
-    if (headers.length === 0 && tableHead) {
+    if (headers.length === 0) {
         headers = [...DB_COLUMNS];
+    }
+    const tableHead = document.getElementById('tableHead');
+    if (tableHead) {
         let headerHtml = '<tr><th class="py-3 px-3 text-center w-14" scope="col">No ID</th>';
         headers.forEach(function(header) {
             let headerTitle = header.replace(/_/g, ' ').toUpperCase();

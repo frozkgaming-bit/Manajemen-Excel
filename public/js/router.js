@@ -1,7 +1,7 @@
 import Login from './pages/Login.js';
 import Dashboard from './pages/Dashboard.js';
 import NotFound from './pages/NotFound.js';
-import { supabaseClient } from '../config/supabase.js';
+import { supabaseClient } from './config/supabase.js';
 
 const routes = {
   '#/login': Login,
@@ -19,15 +19,10 @@ export async function router() {
         window.location.hash = '#/login';
         return;
     }
-    if (session && hash === '#/login') {
-        window.location.hash = '#/dashboard';
-        return;
-    }
-
     if (appContainer) {
         const pageComponent = routes[hash] || NotFound;
 
-        if (hash !== '#/login' && navContainer) {
+        if (hash !== '#/dashboard' && navContainer) {
             navContainer.innerHTML = '';
         }
 
@@ -48,4 +43,3 @@ export function navigate(path) {
 }
 
 window.addEventListener('hashchange', router);
-window.addEventListener('load', router);

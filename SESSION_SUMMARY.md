@@ -1,6 +1,6 @@
 # Session Summary - Proyek Manajemen Excel Pertanahan
 
-**Periode:** 15 - 22 September 2026 (8 hari, 50 commits + 1 merge)
+**Periode:** 15 - 22 September 2026 (8 hari, 51 commits + 1 merge)
 **Branch:** `master` (local) -> `main` (remote: `excel`)
 **Repo:** `https://github.com/frozkgaming-bit/Manajemen-Excel.git`
 
@@ -325,7 +325,7 @@ Search result count: show 0 when no data, keep filter summary visible
 
 ---
 
-### **22 September 2026** - SPA Architecture + Fix (6 commits)
+### **22 September 2026** - SPA Architecture + Fix (7 commits)
 
 #### `e7d694a` - **DWG File Upload** (MILESTONE)
 | File | Perubahan |
@@ -398,6 +398,26 @@ Search result count: show 0 when no data, keep filter summary visible
 | `public/login.html` | **173 baris dihapus** - SPA murni |
 
 **Total: +841 baris, -536 baris** - fix bugs SPA + cleanup
+
+---
+
+### **22 September 2026** - SPA Fix Logic (Uncommitted)
+
+Analisis perbandingan pre-SPA (`7d15029`) vs SPA untuk mengembalikan logic yang hilang/berubah saat refactoring.
+
+| File | Bug | Fix |
+|------|-----|-----|
+| `router.js` | Import path `../config/supabase.js` salah → module crash | Perbaiki ke `./config/supabase.js` |
+| `router.js` | Navbar tidak clear di login page (stale navbar setelah logout) | Ganti condition: clear nav di semua page kecuali dashboard |
+| `router.js` | Missing redirect logged-in user dari `#/login` ke `#/dashboard` | Tambah `if (session && hash === '#/login')` redirect |
+| `index.js` | Panggil `initAuth()` redundant (Login.js sudah handle sendiri) | Hapus import + panggilan `initAuth` |
+| `index.html` | Progress modal tidak punya `progressPercent` element → `progress.js` crash | Ganti dengan pre-SPA progress modal (Tailwind + progressPercent) |
+| `table.js` | `setupHeadersIfNeeded()` headers tidak di-set jika `tableHead` null | Pisahkan: headers init walaupun `tableHead` belum ada |
+| `Dashboard.js` | Dynamic import `supabaseClient` redundant (sudah static import) | Hapus dynamic import, pakai static |
+| `Dashboard.js` | Import `cleanSuratUkur` tidak terpakai | Hapus import |
+| `Login.js` | Dynamic import `supabaseClient` redundant (sudah static import) | Hapus dynamic import |
+| `storageHandler.js` | `uploadStatus` element tidak ada di SPA → TypeError crash | Hapus referensi null, pakai alert + dwgFileName |
+| `Login.js` | 2 icon mata password (custom + browser bawaan) | Hapus custom toggle, gunakan browser built-in |
 
 ---
 
@@ -481,6 +501,70 @@ const btnLogin = document.getElementById('btnLogin'); // baris 16 -> SyntaxError
 **Error:** Upload concurrent menyebabkan ID sequence tidak berurutan.
 **Fix:** Gunakan sequential uploads untuk menjaga ID order (commit `39bffe1`).
 
+### 4.10 `router.js` - Import Path Salah (SPA Crash)
+**Error:**
+```javascript
+import { supabaseClient } from '../config/supabase.js'; // Salah! router.js di public/js/
+```
+Module `supabase.js` ada di `public/js/config/`, bukan `../config/`. Browser gagal resolve → aplikasi crash.
+
+**Fix:** Ganti ke `'./config/supabase.js'` (22 Sep 2026).
+
+### 4.11 `router.js` - Navbar Logic Terbalik
+**Error:**
+```javascript
+if (hash !== '#/login' && navContainer) { navContainer.innerHTML = ''; }
+```
+Navbar di-clear di dashboard (padahal Dashboard.init yang render navbar), tapi TIDAK di-clear di login.
+Setelah logout, navbar lama masih terlihat di halaman login.
+
+**Fix:** Ganti ke `if (hash !== '#/dashboard' && navContainer)` (22 Sep 2026).
+
+### 4.12 `router.js` - Missing Session Redirect
+**Error:** Tidak ada redirect untuk logged-in user yang akses `#/login`.
+Pre-SPA memiliki check: jika session ada dan di login page → redirect ke index.html.
+
+**Fix:** Tambahkan `if (session && hash === '#/login') { window.location.hash = '#/dashboard'; return; }` (22 Sep 2026).
+
+### 4.13 `index.js` - Redundant `initAuth()` Call
+**Error:**
+```javascript
+import { initAuth } from './modules/auth.js';
+router(); initAuth(); // initAuth() crash - #btnLogin belum ada di DOM
+```
+`initAuth()` mencari `#btnLogin` sebelum Login page di-render. Login.js sudah handle login di `init()`.
+
+**Fix:** Hapus import + panggilan `initAuth` (22 Sep 2026).
+
+### 4.14 `index.html` - Progress Modal Missing `progressPercent`
+**Error:** `progress.js` menggunakan `document.getElementById('progressPercent')` tapi element tidak ada di SPA modal → `percentEl` selalu null, persentase tidak tampil.
+
+**Fix:** Ganti progress modal dengan pre-SPA Tailwind version yang punya `progressPercent` span (22 Sep 2026).
+
+### 4.15 `table.js` - `setupHeadersIfNeeded()` Headers Kosong
+**Error:**
+```javascript
+if (headers.length === 0 && tableHead) { headers = [...DB_COLUMNS]; ... }
+```
+Jika `tableHead` belum ada (SPA render timing), headers tidak pernah diisi → `loadMoreData()` tidak render kolom.
+
+**Fix:** Pisahkan: `headers = [...DB_COLUMNS]` dijalankan duluan tanpa bergantung `tableHead` (22 Sep 2026).
+
+### 4.16 `storageHandler.js` - Referensi Element Null
+**Error:** `document.getElementById('uploadStatus')` selalu null (element tidak ada di Dashboard HTML) → TypeError saat user upload DWG.
+
+**Fix:** Hapus referensi `uploadStatus`, ganti dengan `alert()` untuk error/sukses (22 Sep 2026).
+
+### 4.17 `Login.js` + `Dashboard.js` - Redundant Dynamic Import
+**Error:** Kedua file sudah static import `supabaseClient`, tapi仍 melakukan dynamic import `await import('../config/supabase.js')` di handler.
+
+**Fix:** Hapus dynamic import, gunakan static import yang sudah ada (22 Sep 2026).
+
+### 4.18 `Login.js` - Duplicate Password Toggle Icons
+**Error:** Custom eye toggle button di Login.js + browser Edge built-in password toggle → 2 icon mata terlihat.
+
+**Fix:** Hapus custom toggle button + handler, gunakan browser built-in password visibility toggle (22 Sep 2026).
+
 ---
 
 ## 5. Konfigurasi Penting
@@ -500,12 +584,12 @@ const btnLogin = document.getElementById('btnLogin'); // baris 16 -> SyntaxError
 
 ## 6. Progress Saat Ini
 
-### Selesai (50 Commits + 1 Merge)
+### Selesai (51 Commits + 1 Merge)
 - [x] **Fase 1 - Setup (15 Sep):** Project init, Vercel config, README (6 commits)
 - [x] **Fase 2 - CRUD Dasar (17 Sep):** Concurrent upload, pagination, search, print, server-side data count (9 commits)
 - [x] **Fase 3 - Optimasi (18 Sep):** Migrasi ke Supabase client-side, export Excel, ordered fetch, worker pool (9 commits)
 - [x] **Fase 4 - Modular (21 Sep):** Modular architecture, category filter, text cleansing, progress bar, Vercel deploy fixes (21 commits)
-- [x] **Fase 5 - SPA (22 Sep):** SPA architecture, Tailwind redesign, DWG upload, fix bugs SPA (6 commits)
+- [x] **Fase 5 - SPA (22 Sep):** SPA architecture, Tailwind redesign, DWG upload, fix bugs SPA + logic restoration (7 commits)
 - [x] SPA shell (`index.html`) dengan container `#nav-container`, `#app`, `#footer-container`, `#progressModal`
 - [x] Hash-based router (`router.js`) dengan auth protection + Navbar rendering
 - [x] Entry point (`index.js`) single entry point
@@ -533,6 +617,16 @@ const btnLogin = document.getElementById('btnLogin'); // baris 16 -> SyntaxError
 - [x] Import path fix (Login.js)
 - [x] Router Navbar rendering fix
 - [x] SESSION_SUMMARY.md dibuat (dokumentasi lengkap)
+- [x] Router import path fix (`../config` → `./config`)
+- [x] Router navbar logic fix (clear for login, not dashboard)
+- [x] Router session redirect fix (logged-in user on login page)
+- [x] index.js redundant initAuth removed
+- [x] Progress modal progressPercent element added
+- [x] table.js setupHeadersIfNeeded independent of tableHead
+- [x] Dashboard.js redundant dynamic import removed
+- [x] Login.js redundant dynamic import removed
+- [x] storageHandler.js null-safe for missing uploadStatus
+- [x] Login.js duplicate password toggle icon removed
 
 ### Belum / Perlu Verifikasi
 - [ ] Testing end-to-end login -> dashboard flow
@@ -605,7 +699,7 @@ Browser Load
 
 | Metric | Value |
 |--------|-------|
-| Total Commits | 50 + 1 merge = 51 |
+| Total Commits | 51 + 1 merge = 52 |
 | Hari Kerja | 8 hari (15-22 Sep 2026) |
 | File JS | 16 files |
 | File HTML | 1 file (SPA murni) |
@@ -615,14 +709,15 @@ Browser Load
 | Fitur Utama | Auth, CRUD, Excel Upload/Export, Search, Pagination, DWG Upload, Progress Tracking |
 | Baris Code Awal | ~207 baris (15 Sep) |
 | Baris Code Akhir | ~2000+ baris (22 Sep) |
-| Git Status | Clean (tidak ada uncommitted changes) |
+| Git Status | Uncommitted (7 files changed) |
 
 ---
 
 ## 11. Catatan untuk Sesi Berikutnya
 
 1. **Testing:** Jalankan `npx serve public` dan test seluruh fitur secara end-to-end
-2. **Progress bar:** Sudah diubah dari full-screen modal ke floating toast (bottom-right, non-blocking)
+2. **Progress bar:** Sudah diubah dari full-screen modal ke floating toast (bottom-right, non-blocking) dengan progressPercent
 3. **Deploy:** Pastikan `vercel.json` sudah benar untuk static hosting
 4. **Optimasi:** Pertimbangkan code splitting untuk module yang belum dibutuhkan saat initial load
 5. **Push:** Perlu `git push` untuk sync ke remote repository
+6. **Commit:** 7 file berubah dari fix SPA logic - perlu commit terpisah atau digabung
