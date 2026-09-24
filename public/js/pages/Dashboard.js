@@ -1,7 +1,7 @@
 import { supabaseClient, TABLE_NAME, DB_COLUMNS } from '../config/supabase.js';
 import { showProgress, updateProgress, hideProgress } from '../modules/progress.js';
-import { fetchPaginatedData, initTableScroll, initKeteranganHandlers } from '../modules/table.js';
-import { sendToBackendInChunks, initExcelHandlers } from '../modules/excel.js';
+import { fetchPaginatedData, initTableScroll, initKeteranganHandlers, resetPagination } from '../modules/table.js';
+import { initExcelHandlers } from '../modules/excel.js';
 import { fetchServerCounts } from '../modules/stats.js';
 import { initSearch } from '../modules/search.js';
 import { initStorageHandlers } from '../modules/storageHandler.js';
@@ -185,6 +185,7 @@ const init = () => {
     initExcelHandlers();
     initStorageHandlers();
     fetchServerCounts();
+    resetPagination();
     fetchPaginatedData();
 };
 

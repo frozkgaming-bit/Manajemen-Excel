@@ -1,6 +1,6 @@
 import { supabaseClient, TABLE_NAME, DB_COLUMNS } from '../config/supabase.js';
 import { fetchServerCounts } from './stats.js';
-import { setupHeadersIfNeeded, loadMoreData, fetchAllDataConcurrently, getHeaders, getAllData, setAllData, setFilteredData, setCurrentIndex } from './table.js';
+import { setupHeadersIfNeeded, fetchAllDataConcurrently, getHeaders, resetPagination, fetchPaginatedData } from './table.js';
 import { showProgress, updateProgress, hideProgress } from './progress.js';
 
 function cleanSuratUkur(value) {
@@ -117,35 +117,12 @@ export function initExcelHandlers() {
                     });
 
                     let cleanedNewData = Array.from(uniqueMap.values());
-                    let allData = getAllData();
-                    let mapIndex = new Map();
 
-                    allData.forEach((item, idx) => {
-                        let signature = headers.map(header => (item[header] !== undefined && item[header] !== null ? item[header].toString().trim() : '')).join('__');
-                        mapIndex.set(signature, idx);
-                    });
-
-                    cleanedNewData.forEach(newItem => {
-                        let newSignature = headers.map(header => (newItem[header] !== undefined && newItem[header] !== null ? newItem[header].toString().trim() : '')).join('__');
-                        if (mapIndex.has(newSignature)) {
-                            allData[mapIndex.get(newSignature)] = newItem;
-                        } else {
-                            allData.push(newItem);
-                            mapIndex.set(newSignature, allData.length - 1);
-                        }
-                    });
-
-                    setAllData(allData);
-                    setFilteredData([...allData]);
-                    setCurrentIndex(0);
-                    
-                    const tableBody = document.getElementById('tableBody');
-                    if (tableBody) tableBody.innerHTML = "";
-
-                    loadMoreData();
-                    fetchServerCounts();
                     sendToBackendInChunks(cleanedNewData, 10000).finally(() => {
                         hideProgress();
+                        resetPagination();
+                        fetchServerCounts();
+                        fetchPaginatedData();
                     });
                 };
                 reader.readAsArrayBuffer(file);
