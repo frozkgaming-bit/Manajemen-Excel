@@ -56,7 +56,7 @@ export function loadMoreData() {
         let rowClass = "";
 
         if (row['keterangan'] && row['keterangan'].toLowerCase() === 'selesai') {
-            rowClass = "bg-slate-50/30";
+            rowClass = "bg-emerald-50/60";
         }
         
         rowsHtml += `<tr class="hover:bg-slate-50/80 transition-colors ${rowClass}">`;
@@ -278,9 +278,9 @@ export function initKeteranganHandlers() {
             }
 
             if (newStatus === 'Selesai') {
-                tr.classList.add('bg-slate-50/30');
+                tr.classList.add('bg-emerald-50/60');
             } else {
-                tr.classList.remove('bg-slate-50/30');
+                tr.classList.remove('bg-emerald-50/60');
             }
 
             const { fetchServerCounts } = await import('./stats.js');
