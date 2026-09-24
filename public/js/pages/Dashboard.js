@@ -1,6 +1,6 @@
 import { supabaseClient, TABLE_NAME, DB_COLUMNS } from '../config/supabase.js';
 import { showProgress, updateProgress, hideProgress } from '../modules/progress.js';
-import { setupHeadersIfNeeded, loadMoreData, fetchAllDataConcurrently, getHeaders, getAllData, setAllData, setFilteredData, setCurrentIndex, resetPagination, fetchPaginatedData, initTableScroll, initKeteranganHandlers } from '../modules/table.js';
+import { fetchPaginatedData, initTableScroll, initKeteranganHandlers } from '../modules/table.js';
 import { sendToBackendInChunks, initExcelHandlers } from '../modules/excel.js';
 import { fetchServerCounts } from '../modules/stats.js';
 import { initSearch } from '../modules/search.js';
@@ -49,12 +49,6 @@ const render = () => {
                         </div>
                     </div>
                     <div class="mt-5 pt-3 border-t border-slate-100 flex flex-wrap gap-2.5">
-                        <button id="btnPullData" class="inline-flex items-center px-3.5 py-2 border border-transparent rounded-lg text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 focus:outline-hidden transition shadow-xs" type="button">
-                            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
-                            </svg>
-                            Tarik Seluruh Data Dari Database
-                        </button>
                         <button id="btnPrint" class="inline-flex items-center px-3.5 py-2 border border-transparent rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-hidden transition shadow-xs" type="button">
                             <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
@@ -172,6 +166,7 @@ const render = () => {
                     <div class="inline-flex items-center space-x-1" id="paginationControls">
                     </div>
                 </div>
+                <div id="scrollSentinel" class="h-1"></div>
             </div>
             <!-- END: DataTableSection -->
         </main>
@@ -194,17 +189,7 @@ const init = () => {
     initExcelHandlers();
     initStorageHandlers();
     fetchServerCounts();
-
-    const btnPullData = document.getElementById('btnPullData');
-    if (btnPullData) {
-        btnPullData.addEventListener('click', async () => {
-            resetPagination();
-            const searchInput = document.getElementById('searchInput');
-            if (searchInput) searchInput.value = "";
-            fetchServerCounts();
-            await fetchPaginatedData();
-        });
-    }
+    fetchPaginatedData();
 };
 
 export default { render, init };

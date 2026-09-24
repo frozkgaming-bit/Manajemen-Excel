@@ -225,18 +225,22 @@ export async function fetchAllDataConcurrently() {
 }
 
 export function initTableScroll() {
-    const scrollWrapper = document.querySelector('.overflow-x-auto');
-    if (scrollWrapper) {
-        scrollWrapper.addEventListener('scroll', function() {
-            if (scrollWrapper.scrollTop + scrollWrapper.clientHeight >= scrollWrapper.scrollHeight - 5) {
+    const sentinel = document.getElementById('scrollSentinel');
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
                 if (currentIndex < filteredData.length) {
                     loadMoreData();
-                } else {
+                } else if (!isPulling && hasMorePullData) {
                     fetchPaginatedData();
                 }
             }
         });
-    }
+    }, { rootMargin: '200px' });
+
+    observer.observe(sentinel);
 }
 
 export function initKeteranganHandlers() {
