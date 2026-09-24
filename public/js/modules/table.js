@@ -33,6 +33,7 @@ export function setupHeadersIfNeeded() {
             let headerTitle = header.replace(/_/g, ' ').toUpperCase();
             headerHtml += `<th class="py-3 px-4">${headerTitle}</th>`;
         });
+        headerHtml += '<th class="py-3 px-3 text-center w-12" scope="col">✓</th>';
         headerHtml += '</tr>';
         tableHead.innerHTML = headerHtml;
     }
@@ -76,6 +77,10 @@ export function loadMoreData() {
             }
             rowsHtml += `<td class="py-3 px-4 ${cellClass}">${cellValue}</td>`;
         });
+
+        const isChecked = row['keterangan'] && row['keterangan'].toLowerCase() === 'selesai';
+        const rowId = row['id'];
+        rowsHtml += `<td class="py-3 px-3 text-center"><input type="checkbox" class="keterangan-toggle w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer" data-id="${rowId}" ${isChecked ? 'checked' : ''}></td>`;
         
         rowsHtml += '</tr>';
     }
@@ -157,7 +162,7 @@ export async function fetchPaginatedData() {
             if (currentPullPage === 1) {
                 const tableBody = document.getElementById('tableBody');
                 if (tableBody) {
-                    tableBody.innerHTML = `<tr><td colspan="${headers.length + 1}" class="py-12 text-center text-slate-500">Data tidak ditemukan</td></tr>`;
+                    tableBody.innerHTML = `<tr><td colspan="${headers.length + 2}" class="py-12 text-center text-slate-500">Data tidak ditemukan</td></tr>`;
                 }
                 if (searchTerm !== "") {
                     const countFiltered = document.getElementById('countFiltered');
@@ -232,4 +237,58 @@ export function initTableScroll() {
             }
         });
     }
+}
+
+export function initKeteranganHandlers() {
+    const tableBody = document.getElementById('tableBody');
+    if (!tableBody) return;
+
+    tableBody.addEventListener('click', async (e) => {
+        const checkbox = e.target.closest('.keterangan-toggle');
+        if (!checkbox) return;
+
+        const rowId = parseInt(checkbox.dataset.id);
+        if (!rowId) return;
+
+        const newStatus = checkbox.checked ? 'Selesai' : 'Belum Selesai';
+        checkbox.disabled = true;
+
+        try {
+            const { error } = await supabaseClient
+                .from(TABLE_NAME)
+                .update({ keterangan: newStatus })
+                .eq('id', rowId);
+
+            if (error) throw error;
+
+            const row = allData.find(r => r.id === rowId);
+            if (row) row.keterangan = newStatus;
+            const fRow = filteredData.find(r => r.id === rowId);
+            if (fRow) fRow.keterangan = newStatus;
+
+            const keteranganTd = checkbox.closest('tr').querySelector('td:nth-child(' + (headers.length + 2) + ')');
+            if (keteranganTd) {
+                keteranganTd.textContent = newStatus.charAt(0).toUpperCase() + newStatus.slice(1).toLowerCase();
+                keteranganTd.className = 'py-3 px-4 ' + (newStatus === 'Selesai'
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : 'bg-rose-50 text-rose-700 border-rose-200');
+            }
+
+            const rowTr = checkbox.closest('tr');
+            if (newStatus === 'Selesai') {
+                rowTr.classList.add('bg-slate-50/30');
+            } else {
+                rowTr.classList.remove('bg-slate-50/30');
+            }
+
+            const { fetchServerCounts } = await import('./stats.js');
+            fetchServerCounts();
+        } catch (err) {
+            console.error('Gagal update keterangan:', err);
+            checkbox.checked = !checkbox.checked;
+            alert('Gagal memperbarui status: ' + err.message);
+        } finally {
+            checkbox.disabled = false;
+        }
+    });
 }
