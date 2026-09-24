@@ -103,11 +103,6 @@ const render = () => {
                     <div class="w-full md:w-56 shrink-0">
                         <label class="sr-only">Kategori Filter</label>
                         <select id="searchCategory" class="w-full rounded-lg border-slate-200 text-xs font-semibold text-slate-700 bg-slate-50 focus:bg-white focus:border-brand-500 focus:ring-brand-500 py-2">
-                            <option selected="" value="all">Semua Kategori</option>
-                            <option value="kelurahan">KELURAHAN</option>
-                            <option value="nomor_hak">NOMOR HAK</option>
-                            <option value="surat_ukur">SURAT UKUR</option>
-                            <option value="nib">NIB</option>
                         </select>
                     </div>
                     <div class="relative w-full flex items-center">

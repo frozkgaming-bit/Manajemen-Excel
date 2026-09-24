@@ -9,6 +9,10 @@ export function initSearch() {
     if (!searchCategory || !searchInput || !btnSearch) return;
 
     if (searchCategory.options.length <= 1) {
+        const allOption = document.createElement('option');
+        allOption.value = 'all';
+        allOption.textContent = 'Semua Kategori';
+        searchCategory.appendChild(allOption);
         DB_COLUMNS.forEach(col => {
             const option = document.createElement('option');
             option.value = col;
