@@ -27,23 +27,13 @@ const render = () => {
                         </div>
                         <div class="mt-4 space-y-3.5">
                             <div class="flex flex-col sm:flex-row sm:items-center justify-between text-xs gap-2">
-                                <label class="font-medium text-slate-700 min-w-44">Upload Basis Data Utama:</label>
+                                <label class="font-medium text-slate-700 min-w-44">Upload File Excel:</label>
                                 <div class="flex items-center w-full max-w-md bg-slate-50 border border-slate-200 rounded-lg p-1 focus-within:border-brand-500">
                                     <label class="cursor-pointer bg-white border border-slate-200 text-slate-700 px-2.5 py-1 rounded text-xs font-medium hover:bg-slate-100 transition shadow-2xs shrink-0">
                                         <span class="">Choose File</span>
-                                        <input class="hidden" type="file" id="fileUploadMain" accept=".xlsx, .xls, .csv" />
+                                        <input class="hidden" type="file" id="fileUploadExcel" accept=".xlsx, .xls, .csv" />
                                     </label>
-                                    <span class="ml-3 text-slate-600 text-xs truncate font-medium" id="mainFileName">No file chosen</span>
-                                </div>
-                            </div>
-                            <div class="flex flex-col sm:flex-row sm:items-center justify-between text-xs gap-2">
-                                <label class="font-medium text-slate-700 min-w-44">Upload Data Selesai <span class="text-slate-400">(Otomatis "Selesai")</span>:</label>
-                                <div class="flex items-center w-full max-w-md bg-slate-50 border border-slate-200 rounded-lg p-1">
-                                    <label class="cursor-pointer bg-white border border-slate-200 text-slate-700 px-2.5 py-1 rounded text-xs font-medium hover:bg-slate-100 transition shadow-2xs shrink-0">
-                                        <span class="">Choose File</span>
-                                        <input class="hidden" type="file" id="fileUploadDone" accept=".xlsx, .xls, .csv" />
-                                    </label>
-                                    <span class="ml-3 text-slate-400 text-xs truncate" id="doneFileName">No file chosen</span>
+                                    <span class="ml-3 text-slate-600 text-xs truncate font-medium" id="excelFileName">No file chosen</span>
                                 </div>
                             </div>
                         </div>

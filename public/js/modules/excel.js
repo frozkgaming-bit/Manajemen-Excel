@@ -11,27 +11,27 @@ function cleanSuratUkur(value) {
     return str;
 }
 
+const ON_CONFLICT_COLUMNS = [...DB_COLUMNS].join(',');
+
 export async function sendToBackendInChunks(dataArray, chunkSize = 10000) {
     if (!dataArray || dataArray.length === 0) return;
     
     let successCount = 0;
     const total = dataArray.length;
-    const totalChunks = Math.ceil(total / chunkSize);
 
     showProgress("Mengunggah Data ke Database", 0, `0 / ${total.toLocaleString('id-ID')} baris (0%)`);
 
-    const uploadMain = document.getElementById('fileUploadMain');
-    const uploadDone = document.getElementById('fileUploadDone');
-    if (uploadMain) uploadMain.disabled = true;
-    if (uploadDone) uploadDone.disabled = true;
+    const fileInput = document.getElementById('fileUploadExcel');
+    if (fileInput) fileInput.disabled = true;
 
+    const totalChunks = Math.ceil(total / chunkSize);
     for (let i = 0; i < totalChunks; i++) {
         const from = i * chunkSize;
         const chunk = dataArray.slice(from, from + chunkSize);
 
         const { error } = await supabaseClient
             .from(TABLE_NAME)
-            .upsert(chunk, { onConflict: 'kelurahan,nomor_hak,surat_ukur,nib,luas,produk,luas_peta,validator_tekstual,validator_peta,blokir_internal,kw,pemilik_pertama,pemilik_akhir,tipe_hak' });
+            .upsert(chunk, { onConflict: ON_CONFLICT_COLUMNS });
 
         if (error) {
             console.error(`Gagal batch ${i + 1}:`, error.message);
@@ -45,10 +45,7 @@ export async function sendToBackendInChunks(dataArray, chunkSize = 10000) {
         await new Promise(r => setTimeout(r, 10));
     }
 
-    const uploadMainEl = document.getElementById('fileUploadMain');
-    const uploadDoneEl = document.getElementById('fileUploadDone');
-    if (uploadMain) uploadMain.disabled = false;
-    if (uploadDone) uploadDone.disabled = false;
+    if (fileInput) fileInput.disabled = false;
 
     updateProgress(100, `Selesai! Berhasil menyimpan ${successCount.toLocaleString('id-ID')} baris.`);
     setTimeout(() => {
@@ -60,12 +57,11 @@ export async function sendToBackendInChunks(dataArray, chunkSize = 10000) {
 }
 
 export function initExcelHandlers() {
-    const fileUploadMain = document.getElementById('fileUploadMain');
-    const fileUploadDone = document.getElementById('fileUploadDone');
+    const fileUploadExcel = document.getElementById('fileUploadExcel');
     const btnPrint = document.getElementById('btnPrint');
 
-    if (fileUploadMain) {
-        fileUploadMain.addEventListener('change', function(e) {
+    if (fileUploadExcel) {
+        fileUploadExcel.addEventListener('change', function(e) {
             var file = e.target.files[0];
             if (!file) return;
 
@@ -90,97 +86,30 @@ export function initExcelHandlers() {
                         var lowerRow = {};
                         for (var key in row) lowerRow[key.toLowerCase()] = row[key];
                         if (lowerRow['surat_ukur']) lowerRow['surat_ukur'] = cleanSuratUkur(lowerRow['surat_ukur']);
+                        if (!lowerRow['keterangan']) lowerRow['keterangan'] = 'Belum Selesai';
                         return lowerRow;
                     });
 
-                    newData.forEach(row => { row['keterangan'] = "Belum Selesai"; });
                     setupHeadersIfNeeded();
                     let headers = getHeaders();
                     let uniqueMap = new Map();
 
                     newData.forEach(item => {
-                        item['keterangan'] = "Belum Selesai";
-                        let signature = headers.filter(header => header !== 'keterangan').map(header => (item[header] !== undefined && item[header] !== null ? item[header].toString().trim() : '')).join('__');
+                        let signature = headers.map(header => (item[header] !== undefined && item[header] !== null ? item[header].toString().trim() : '')).join('__');
                         uniqueMap.set(signature, item);
                     });
 
-                    let cleanedNewData = Array.from(uniqueMap.values());
-                    let allData = getAllData();
-                    allData = allData.concat(cleanedNewData);
-                    setAllData(allData);
-
-                    const searchInput = document.getElementById('searchInput');
-                    if (searchInput) searchInput.value = "";
-                    setFilteredData([...allData]);
-                    setCurrentIndex(0);
-                    
-                    const tableBody = document.getElementById('tableBody');
-                    if (tableBody) tableBody.innerHTML = "";
-
-                    loadMoreData();
-                    fetchServerCounts();
-                    sendToBackendInChunks(cleanedNewData, 10000).finally(() => {
-                        hideProgress();
-                    });
-                    e.target.value = "";
-                };
-                reader.readAsArrayBuffer(file);
-            }, 50);
-
-            e.target.value = "";
-        });
-    }
-
-    if (fileUploadDone) {
-        fileUploadDone.addEventListener('change', function(e) {
-            var file = e.target.files[0];
-            if (!file) return;
-
-            showProgress("Membaca File Excel Selesai", 15, "Sedang memproses file, mohon tunggu...");
-
-            setTimeout(() => {
-                var reader = new FileReader();
-                reader.onload = function(e) {
-                    var data = new Uint8Array(e.target.result);
-                    var workbook = XLSX.read(data, {type: 'array'});
-                    var firstSheetName = workbook.SheetNames[0];
-                    var worksheet = workbook.Sheets[firstSheetName];
-                    var rawData = XLSX.utils.sheet_to_json(worksheet, {defval: ""});
-
-                    if (rawData.length === 0) { 
-                        hideProgress();
-                        alert("File kosong."); 
-                        return; 
-                    }
-
-                    var newData = rawData.map(function(row) {
-                        var lowerRow = {};
-                        for (var key in row) lowerRow[key.toLowerCase()] = row[key];
-                        if (lowerRow['surat_ukur']) lowerRow['surat_ukur'] = cleanSuratUkur(lowerRow['surat_ukur']);
-                        return lowerRow;
-                    });
-
-                    setupHeadersIfNeeded();
-
-                    let headers = getHeaders();
-                    let uniqueMap = new Map();
-                    newData.forEach(item => {
-                        item['keterangan'] = "Selesai";
-                        let signature = headers.filter(header => header !== 'keterangan').map(header => (item[header] !== undefined && item[header] !== null ? item[header].toString().trim() : '')).join('__');
-                        uniqueMap.set(signature, item);
-                    });
-                    
                     let cleanedNewData = Array.from(uniqueMap.values());
                     let allData = getAllData();
                     let mapIndex = new Map();
 
                     allData.forEach((item, idx) => {
-                        let signature = headers.filter(header => header !== 'keterangan').map(header => (item[header] !== undefined && item[header] !== null ? item[header].toString().trim() : '')).join('__');
+                        let signature = headers.map(header => (item[header] !== undefined && item[header] !== null ? item[header].toString().trim() : '')).join('__');
                         mapIndex.set(signature, idx);
                     });
 
                     cleanedNewData.forEach(newItem => {
-                        let newSignature = headers.filter(header => header !== 'keterangan').map(header => (newItem[header] !== undefined && newItem[header] !== null ? newItem[header].toString().trim() : '')).join('__');
+                        let newSignature = headers.map(header => (newItem[header] !== undefined && newItem[header] !== null ? newItem[header].toString().trim() : '')).join('__');
                         if (mapIndex.has(newSignature)) {
                             allData[mapIndex.get(newSignature)] = newItem;
                         } else {
@@ -188,16 +117,14 @@ export function initExcelHandlers() {
                             mapIndex.set(newSignature, allData.length - 1);
                         }
                     });
-                    
+
                     setAllData(allData);
-                    const searchInput = document.getElementById('searchInput');
-                    if (searchInput) searchInput.value = "";
                     setFilteredData([...allData]);
                     setCurrentIndex(0);
                     
                     const tableBody = document.getElementById('tableBody');
                     if (tableBody) tableBody.innerHTML = "";
-                    
+
                     loadMoreData();
                     fetchServerCounts();
                     sendToBackendInChunks(cleanedNewData, 10000).finally(() => {
