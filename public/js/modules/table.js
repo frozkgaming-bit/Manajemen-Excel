@@ -268,7 +268,7 @@ export function initKeteranganHandlers() {
 
             const tr = checkbox.closest('tr');
             const tds = tr.querySelectorAll('td');
-            const keteranganTd = tds[headers.length + 1];
+            const keteranganTd = tds[headers.length];
             if (keteranganTd) {
                 const displayVal = newStatus.charAt(0).toUpperCase() + newStatus.slice(1).toLowerCase();
                 keteranganTd.textContent = displayVal;
