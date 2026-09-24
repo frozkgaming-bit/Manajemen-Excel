@@ -266,19 +266,21 @@ export function initKeteranganHandlers() {
             const fRow = filteredData.find(r => r.id === rowId);
             if (fRow) fRow.keterangan = newStatus;
 
-            const keteranganTd = checkbox.closest('tr').querySelector('td:nth-child(' + (headers.length + 2) + ')');
+            const tr = checkbox.closest('tr');
+            const tds = tr.querySelectorAll('td');
+            const keteranganTd = tds[headers.length + 1];
             if (keteranganTd) {
-                keteranganTd.textContent = newStatus.charAt(0).toUpperCase() + newStatus.slice(1).toLowerCase();
+                const displayVal = newStatus.charAt(0).toUpperCase() + newStatus.slice(1).toLowerCase();
+                keteranganTd.textContent = displayVal;
                 keteranganTd.className = 'py-3 px-4 ' + (newStatus === 'Selesai'
                     ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                     : 'bg-rose-50 text-rose-700 border-rose-200');
             }
 
-            const rowTr = checkbox.closest('tr');
             if (newStatus === 'Selesai') {
-                rowTr.classList.add('bg-slate-50/30');
+                tr.classList.add('bg-slate-50/30');
             } else {
-                rowTr.classList.remove('bg-slate-50/30');
+                tr.classList.remove('bg-slate-50/30');
             }
 
             const { fetchServerCounts } = await import('./stats.js');
