@@ -220,8 +220,10 @@ export function initExcelHandlers() {
             btn.disabled = true;
 
             try {
+                showProgress("Mengekspor ke Excel", 5, "Mengambil data dari database...");
                 const allExportData = await fetchAllDataConcurrently();
                 if (!allExportData || allExportData.length === 0) {
+                    hideProgress();
                     alert("Tidak ada data untuk diexport di database.");
                     return;
                 }
@@ -233,8 +235,9 @@ export function initExcelHandlers() {
                 }
 
                 const aoaData = [formattedHeaders];
+                const totalRows = allExportData.length;
 
-                for (let i = 0; i < allExportData.length; i++) {
+                for (let i = 0; i < totalRows; i++) {
                     const row = allExportData[i];
                     const rowArray = [i + 1];
                     for (let j = 0; j < columns.length; j++) {
@@ -242,15 +245,24 @@ export function initExcelHandlers() {
                         rowArray.push(row[col] !== undefined && row[col] !== null ? row[col] : '');
                     }
                     aoaData.push(rowArray);
+                    if (i % 10000 === 0) {
+                        const percent = 80 + Math.round((i / totalRows) * 18);
+                        updateProgress(percent, `Menyiapkan file: ${i.toLocaleString('id-ID')} / ${totalRows.toLocaleString('id-ID')} baris`);
+                    }
                 }
                 allExportData.length = 0;
 
+                updateProgress(99, "Menulis file Excel...");
                 const worksheet = XLSX.utils.aoa_to_sheet(aoaData);
                 const workbook = XLSX.utils.book_new();
                 XLSX.utils.book_append_sheet(workbook, worksheet, "Data_Cimahi");
                 XLSX.writeFile(workbook, "Data_Kwalitas_Cimahi.xlsx");
+
+                updateProgress(100, "Selesai!");
+                setTimeout(hideProgress, 500);
             } catch (error) {
                 console.error("Gagal mengekspor data:", error);
+                hideProgress();
                 alert("Terjadi kesalahan saat mengekspor data.");
             } finally {
                 btn.innerText = originalText;

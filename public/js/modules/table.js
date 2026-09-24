@@ -189,30 +189,32 @@ export function resetPagination() {
 }
 
 export async function fetchAllDataConcurrently() {
-    const limit = 1000;
     const { count, error: countError } = await supabaseClient.from(TABLE_NAME).select('*', { count: 'exact', head: true });
     if (countError) { alert("Gagal menghitung total data: " + countError.message); return null; }
     if (count === 0) return [];
 
     const totalPages = Math.ceil(count / 1000);
-    const maxConcurrent = 5;
-    const pagedData = new Array(Math.ceil(count / 1000));
+    const pagedData = new Array(totalPages);
+    let completedPages = 0;
     let currentPage = 0;
 
     const selectQuery = 'id,' + DB_COLUMNS.join(',');
 
     const fetchWorker = async () => {
-        while (currentPage < Math.ceil(count / 1000)) {
-            const page = currentPage++; 
+        while (currentPage < totalPages) {
+            const page = currentPage++;
             const from = page * 1000;
             const to = from + 1000 - 1;
-            const { data, error } = await supabaseClient.from(TABLE_NAME).select('id,' + DB_COLUMNS.join(',')).order('id', { ascending: true }).range(from, to);
+            const { data, error } = await supabaseClient.from(TABLE_NAME).select(selectQuery).order('id', { ascending: true }).range(from, to);
             if (error) throw error;
-            pagedData[page] = data; 
+            pagedData[page] = data;
+            completedPages++;
+            const percent = Math.round((completedPages / totalPages) * 80);
+            updateProgress(percent, `Mengambil data: ${completedPages}/${totalPages} halaman (${count.toLocaleString('id-ID')} total baris)`);
         }
     };
 
-    const workers = Array.from({ length: Math.min(5, Math.ceil(count / 1000)) }, () => fetchWorker());
+    const workers = Array.from({ length: Math.min(5, totalPages) }, () => fetchWorker());
     try { await Promise.all(workers); } catch (error) { alert("Gagal mengekspor data: " + error.message); return null; }
     return pagedData.flat();
 }
