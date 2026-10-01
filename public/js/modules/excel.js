@@ -4,8 +4,8 @@ import { setupHeadersIfNeeded, fetchAllDataConcurrently, getHeaders, resetPagina
 import { showProgress, updateProgress, hideProgress } from './progress.js';
 
 function cleanSuratUkur(value) {
-    if (!value) return "";
-    const str = value.toString().trim();
+    const str = toCellString(value);
+    if (!str) return "";
     const match = str.match(/^((?:SU|GS)?[.\s]?\d+)\/[^/]+\/(\d{4})$/i);
     if (match) return `${match[1].trim()}/${match[2]}`;
     return str;
@@ -14,19 +14,28 @@ function cleanSuratUkur(value) {
 const ON_CONFLICT_COLUMNS = DB_COLUMNS.filter(c => c !== 'keterangan').join(',');
 const DATA_COLUMNS = DB_COLUMNS.filter(c => c !== 'keterangan');
 
+// Semua kolom DB bertipe string — seluruh nilai Excel dipaksa jadi string
+// sebelum signature/upsert, supaya angka di Excel ("238") identik dengan
+// teks di DB ("238") dan ON CONFLICT bisa match.
+function toCellString(value) {
+    if (value === undefined || value === null) return '';
+    if (value instanceof Date) {
+        const y = value.getFullYear();
+        const m = String(value.getMonth() + 1).padStart(2, '0');
+        const d = String(value.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+    return String(value).trim();
+}
+
 function normalizeHeader(header) {
-    return header
-        .toString()
-        .trim()
+    return toCellString(header)
         .toLowerCase()
         .replace(/[\s-]+/g, '_');
 }
 
 function buildSignature(row, cols) {
-    return cols.map(col => {
-        const v = row[col];
-        return (v !== undefined && v !== null) ? v.toString().trim() : '';
-    }).join('__');
+    return cols.map(col => toCellString(row[col])).join('__');
 }
 
 function normalizeExcelRow(row) {
@@ -35,16 +44,12 @@ function normalizeExcelRow(row) {
     Object.entries(row).forEach(([key, value]) => {
         const normalizedKey = normalizeHeader(key);
         if (DB_COLUMNS.includes(normalizedKey)) {
-            normalizedRow[normalizedKey] = value;
+            normalizedRow[normalizedKey] = toCellString(value);
         }
     });
 
     DB_COLUMNS.forEach(col => {
-        if (normalizedRow[col] === undefined || normalizedRow[col] === null) {
-            normalizedRow[col] = '';
-        } else if (typeof normalizedRow[col] === 'string') {
-            normalizedRow[col] = normalizedRow[col].trim();
-        }
+        if (normalizedRow[col] === undefined) normalizedRow[col] = '';
     });
 
     if (!normalizedRow.keterangan) normalizedRow.keterangan = 'Belum Selesai';
@@ -230,7 +235,7 @@ export function initExcelHandlers() {
                         var workbook = XLSX.read(data, { type: 'array' });
                         var firstSheetName = workbook.SheetNames[0];
                         var worksheet = workbook.Sheets[firstSheetName];
-                        var rawHeaders = XLSX.utils.sheet_to_json(worksheet, { header: 1 })[0] || [];
+                        var rawHeaders = (XLSX.utils.sheet_to_json(worksheet, { header: 1 })[0] || []).map(toCellString);
                         var rawData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
 
                         if (rawData.length === 0) {
@@ -362,7 +367,7 @@ export function initExcelHandlers() {
                     const rowArray = [i + 1];
                     for (let j = 0; j < columns.length; j++) {
                         const col = columns[j];
-                        rowArray.push(row[col] !== undefined && row[col] !== null ? row[col] : '');
+                        rowArray.push(toCellString(row[col]));
                     }
                     aoaData.push(rowArray);
                     if (i % 10000 === 0) {

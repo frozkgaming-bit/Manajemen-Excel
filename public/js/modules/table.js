@@ -22,6 +22,17 @@ export function setFilteredData(val) { filteredData = val; }
 export function setCurrentIndex(val) { currentIndex = val; }
 export function setHeaders(val) { headers = val; }
 
+// Semua kolom DB bertipe string — paksa nilai dari Supabase jadi string
+// supaya display/export/signature konsisten dengan data Excel.
+function coerceDbRow(row) {
+    const out = { ...row };
+    DB_COLUMNS.forEach(col => {
+        const v = out[col];
+        out[col] = (v === undefined || v === null) ? '' : (typeof v === 'string' ? v.trim() : String(v).trim());
+    });
+    return out;
+}
+
 export function setupHeadersIfNeeded() {
     if (headers.length === 0) {
         headers = [...DB_COLUMNS];
@@ -146,7 +157,7 @@ export async function fetchPaginatedData() {
 
         if (data && data.length > 0) {
             setupHeadersIfNeeded();
-            allData.push(...data);
+            allData.push(...data.map(coerceDbRow));
             filteredData = [...allData];
             loadMoreData();
             
@@ -212,7 +223,7 @@ export async function fetchAllDataConcurrently() {
             const to = from + 1000 - 1;
             const { data, error } = await supabaseClient.from(TABLE_NAME).select(selectQuery).order('id', { ascending: true }).range(from, to);
             if (error) throw error;
-            pagedData[page] = data;
+            pagedData[page] = (data || []).map(coerceDbRow);
             completedPages++;
             const percent = Math.round((completedPages / totalPages) * 80);
             updateProgress(percent, `Mengambil data: ${completedPages}/${totalPages} halaman (${count.toLocaleString('id-ID')} total baris)`);
