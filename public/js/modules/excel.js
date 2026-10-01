@@ -12,6 +12,7 @@ function cleanSuratUkur(value) {
 }
 
 const ON_CONFLICT_COLUMNS = DB_COLUMNS.filter(c => c !== 'keterangan').join(',');
+const DATA_COLUMNS = DB_COLUMNS.filter(c => c !== 'keterangan');
 
 function normalizeHeader(header) {
     return header
@@ -19,6 +20,13 @@ function normalizeHeader(header) {
         .trim()
         .toLowerCase()
         .replace(/[\s-]+/g, '_');
+}
+
+function buildSignature(row, cols) {
+    return cols.map(col => {
+        const v = row[col];
+        return (v !== undefined && v !== null) ? v.toString().trim() : '';
+    }).join('__');
 }
 
 function normalizeExcelRow(row) {
@@ -31,8 +39,62 @@ function normalizeExcelRow(row) {
         }
     });
 
+    DB_COLUMNS.forEach(col => {
+        if (normalizedRow[col] === undefined || normalizedRow[col] === null) {
+            normalizedRow[col] = '';
+        } else if (typeof normalizedRow[col] === 'string') {
+            normalizedRow[col] = normalizedRow[col].trim();
+        }
+    });
+
     if (!normalizedRow.keterangan) normalizedRow.keterangan = 'Belum Selesai';
     return normalizedRow;
+}
+
+function validateExcelHeaders(rawHeaders) {
+    const excelHeaders = new Set(rawHeaders.map(h => normalizeHeader(h)));
+    const missing = DATA_COLUMNS.filter(c => !excelHeaders.has(c));
+    const matched = DATA_COLUMNS.length - missing.length;
+
+    if (matched === 0) {
+        return { ok: false, missing, message: 'Tidak ada kolom Excel yang cocok dengan database. Periksa nama header file.' };
+    }
+
+    const identifierCols = ['kelurahan', 'nomor_hak', 'surat_ukur', 'nib'];
+    const missingIdentifiers = identifierCols.filter(c => missing.includes(c));
+    if (missingIdentifiers.length > 0) {
+        return { ok: false, missing, message: `Kolom identifier wajib tidak ditemukan di Excel: ${missingIdentifiers.join(', ')}` };
+    }
+
+    if (missing.length > 0) {
+        console.warn('Kolom Excel tidak ditemukan (akan diisi kosong):', missing);
+    }
+    return { ok: true, missing };
+}
+
+async function fetchAllSelesaiRows(cols) {
+    const selectCols = cols.join(',');
+    const pageSize = 1000;
+    const all = [];
+    let page = 0;
+
+    while (true) {
+        const from = page * pageSize;
+        const to = from + pageSize - 1;
+        const { data, error } = await supabaseClient
+            .from(TABLE_NAME)
+            .select(selectCols)
+            .eq('keterangan', 'Selesai')
+            .order('id', { ascending: true })
+            .range(from, to);
+
+        if (error) throw new Error(`Gagal mengambil data 'Selesai' dari database: ${error.message}`);
+        if (!data || data.length === 0) break;
+        all.push(...data);
+        if (data.length < pageSize) break;
+        page++;
+    }
+    return all;
 }
 
 export async function sendToBackendInChunks(dataArray, chunkSize = 10000) {
@@ -43,7 +105,7 @@ export async function sendToBackendInChunks(dataArray, chunkSize = 10000) {
     if (!session) {
         throw new Error('Sesi login sudah berakhir. Silakan login kembali.');
     }
-    
+
     let successCount = 0;
     const total = dataArray.length;
 
@@ -74,7 +136,7 @@ export async function sendToBackendInChunks(dataArray, chunkSize = 10000) {
 
         const percent = Math.min(100, Math.round((successCount / total) * 100));
         updateProgress(percent, `Mengunggah: ${successCount.toLocaleString('id-ID')} / ${total.toLocaleString('id-ID')} baris (${percent}%)`);
-        
+
         await new Promise(r => setTimeout(r, 10));
     }
 
@@ -133,6 +195,11 @@ export function initExcelHandlers() {
     if (btnUploadExcel) {
         let isUploading = false;
 
+        function resetUploadState() {
+            isUploading = false;
+            btnUploadExcel.disabled = false;
+        }
+
         btnUploadExcel.addEventListener('click', function() {
             if (isUploading) return;
 
@@ -150,102 +217,116 @@ export function initExcelHandlers() {
 
             setTimeout(() => {
                 var reader = new FileReader();
+
+                reader.onerror = function() {
+                    hideProgress();
+                    alert('Gagal membaca file Excel. Pastikan file tidak rusak.');
+                    resetUploadState();
+                };
+
                 reader.onload = async function(e) {
-                    var data = new Uint8Array(e.target.result);
-                    var workbook = XLSX.read(data, {type: 'array'});
-                    var firstSheetName = workbook.SheetNames[0];
-                    var worksheet = workbook.Sheets[firstSheetName];
-                    var rawData = XLSX.utils.sheet_to_json(worksheet, {defval: ""});
-                    
-                    if (rawData.length === 0) { 
-                        hideProgress();
-                        alert("File kosong."); 
-                        isUploading = false;
-                        btnUploadExcel.disabled = false;
-                        return; 
-                    }
-
-                    var newData = rawData.map(normalizeExcelRow);
-                    newData.forEach(row => {
-                        if (row.surat_ukur) row.surat_ukur = cleanSuratUkur(row.surat_ukur);
-                    });
-
-                    setupHeadersIfNeeded();
-                    let headers = getHeaders();
-                    const dataColumns = headers.filter(h => h !== 'keterangan');
-                    let uniqueMap = new Map();
-
-                    newData.forEach(item => {
-                        let signature = dataColumns.map(col => (item[col] !== undefined && item[col] !== null ? item[col].toString().trim() : '')).join('__');
-                        if (!uniqueMap.has(signature)) {
-                            uniqueMap.set(signature, item);
-                        } else {
-                            const existing = uniqueMap.get(signature);
-                            if (item.keterangan && item.keterangan.toLowerCase() === 'selesai') {
-                                uniqueMap.set(signature, item);
-                            }
-                        }
-                    });
-
-                    let cleanedNewData = Array.from(uniqueMap.values());
-
-                    updateProgress(30, "Memeriksa data 'Selesai' yang sudah ada...");
-                    const selectCols = dataColumns.join(',');
-                    const { data: existingSelesai } = await supabaseClient
-                        .from(TABLE_NAME)
-                        .select(selectCols)
-                        .eq('keterangan', 'Selesai');
-
-                    const selesaiSignatures = new Set();
-                    if (existingSelesai && existingSelesai.length > 0) {
-                        existingSelesai.forEach(row => {
-                            let sig = dataColumns.map(col => (row[col] !== undefined && row[col] !== null ? row[col].toString().trim() : '')).join('__');
-                            selesaiSignatures.add(sig);
-                        });
-                    }
-
-                    updateProgress(50, `Menyaring data... ${selesaiSignatures.size} data 'Selesai' sudah ada di database.`);
-
-                    const toUpload = [];
-                    let skippedCount = 0;
-                    cleanedNewData.forEach(item => {
-                        let dataSig = dataColumns.map(col => (item[col] !== undefined && item[col] !== null ? item[col].toString().trim() : '')).join('__');
-                        if (item.keterangan && item.keterangan.toLowerCase() === 'selesai') {
-                            toUpload.push(item);
-                        } else if (selesaiSignatures.has(dataSig)) {
-                            skippedCount++;
-                        } else {
-                            toUpload.push(item);
-                        }
-                    });
-
-                    if (skippedCount > 0) {
-                        updateProgress(60, `Dilewati: ${skippedCount} baris sudah 'Selesai' di database.`);
-                    }
-
-                    if (toUpload.length === 0) {
-                        hideProgress();
-                        alert(`Tidak ada data baru untuk diunggah.\n${skippedCount} baris dilewati (sudah 'Selesai' di database).`);
-                        isUploading = false;
-                        btnUploadExcel.disabled = false;
-                        return;
-                    }
-
                     try {
-                        await sendToBackendInChunks(toUpload, 10000);
+                        var data = new Uint8Array(e.target.result);
+                        var workbook = XLSX.read(data, { type: 'array' });
+                        var firstSheetName = workbook.SheetNames[0];
+                        var worksheet = workbook.Sheets[firstSheetName];
+                        var rawHeaders = XLSX.utils.sheet_to_json(worksheet, { header: 1 })[0] || [];
+                        var rawData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+
+                        if (rawData.length === 0) {
+                            hideProgress();
+                            alert("File kosong.");
+                            resetUploadState();
+                            return;
+                        }
+
+                        const headerCheck = validateExcelHeaders(rawHeaders);
+                        if (!headerCheck.ok) {
+                            hideProgress();
+                            alert(headerCheck.message);
+                            resetUploadState();
+                            return;
+                        }
+
+                        var newData = rawData.map(normalizeExcelRow);
+                        newData.forEach(row => {
+                            if (row.surat_ukur) row.surat_ukur = cleanSuratUkur(row.surat_ukur);
+                        });
+
+                        setupHeadersIfNeeded();
+                        let headers = getHeaders();
+                        const dataColumns = headers.filter(h => h !== 'keterangan');
+                        let uniqueMap = new Map();
+
+                        newData.forEach(item => {
+                            let signature = buildSignature(item, dataColumns);
+                            if (!uniqueMap.has(signature)) {
+                                uniqueMap.set(signature, item);
+                            } else {
+                                const existing = uniqueMap.get(signature);
+                                if (item.keterangan && item.keterangan.toLowerCase() === 'selesai') {
+                                    uniqueMap.set(signature, item);
+                                }
+                            }
+                        });
+
+                        let cleanedNewData = Array.from(uniqueMap.values());
+
+                        updateProgress(30, "Memeriksa data 'Selesai' yang sudah ada...");
+                        const existingSelesai = await fetchAllSelesaiRows(dataColumns);
+
+                        const selesaiSignatures = new Set();
+                        existingSelesai.forEach(row => {
+                            selesaiSignatures.add(buildSignature(row, dataColumns));
+                        });
+
+                        updateProgress(50, `Menyaring data... ${selesaiSignatures.size} data 'Selesai' sudah ada di database.`);
+
+                        const toUpload = [];
+                        let skippedCount = 0;
+                        cleanedNewData.forEach(item => {
+                            let dataSig = buildSignature(item, dataColumns);
+                            if (item.keterangan && item.keterangan.toLowerCase() === 'selesai') {
+                                toUpload.push(item);
+                            } else if (selesaiSignatures.has(dataSig)) {
+                                skippedCount++;
+                            } else {
+                                toUpload.push(item);
+                            }
+                        });
+
+                        if (skippedCount > 0) {
+                            updateProgress(60, `Dilewati: ${skippedCount} baris sudah 'Selesai' di database.`);
+                        }
+
+                        if (toUpload.length === 0) {
+                            hideProgress();
+                            alert(`Tidak ada data baru untuk diunggah.\n${skippedCount} baris dilewati (sudah 'Selesai' di database).`);
+                            resetUploadState();
+                            return;
+                        }
+
+                        try {
+                            await sendToBackendInChunks(toUpload, 10000);
+                        } catch (error) {
+                            console.error('Gagal mengunggah data Excel:', error);
+                            hideProgress();
+                            alert(`Upload gagal: ${error.message}`);
+                        } finally {
+                            hideProgress();
+                            resetUploadState();
+                            resetPagination();
+                            fetchServerCounts();
+                            fetchPaginatedData();
+                        }
                     } catch (error) {
-                        console.error('Gagal mengunggah data Excel:', error);
+                        console.error('Gagal memproses file Excel:', error);
                         hideProgress();
-                        alert(`Upload gagal: ${error.message}`);
-                    } finally {
-                        hideProgress();
-                        isUploading = false;
-                        btnUploadExcel.disabled = false;
-                        resetPagination();
-                        fetchServerCounts();
-                        fetchPaginatedData();
+                        alert(`Terjadi kesalahan saat memproses file: ${error.message}`);
+                        resetUploadState();
                     }
                 };
+
                 reader.readAsArrayBuffer(file);
             }, 50);
         });

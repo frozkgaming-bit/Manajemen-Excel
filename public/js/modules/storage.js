@@ -16,7 +16,6 @@ export async function uploadDwgFile(file, onProgress) {
     }
 
     // Sanitasi nama file dan tambahkan timestamp
-    const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
     const filePath = `drawings/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
 
     const { data, error } = await supabaseClient.storage

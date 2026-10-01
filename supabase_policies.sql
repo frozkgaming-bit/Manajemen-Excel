@@ -28,3 +28,50 @@ create policy "authenticated users can update kwalitas data"
     to authenticated
     using (true)
     with check (true);
+
+-- Unique index yang dibutuhkan oleh client-side upsert
+-- (onConflict di excel.js = semua kolom kecuali keterangan).
+-- Tanpa index ini, setiap upsert gagal dengan error:
+-- "there is no unique or exclusion constraint matching the ON CONFLICT specification"
+create unique index if not exists uq_kwalitas_data_cimahi_natural_key
+    on public.kwalitas_data_cimahi
+    (kelurahan, nomor_hak, surat_ukur, nib, luas, produk, luas_peta,
+     validator_tekstual, validator_peta, blokir_internal, kw,
+     pemilik_pertama, pemilik_akhir, tipe_hak);
+
+-- Trigger: pertahankan keterangan 'Selesai' saat upsert Excel
+-- menimpa baris yang sudah Selesai (kolom data ikut berubah).
+-- Update checkbox di UI hanya mengubah keterangan → tetap diperbolehkan.
+create or replace function public.preserve_selesai_keterangan()
+returns trigger
+language plpgsql
+as $$
+begin
+    if old.keterangan = 'Selesai' and new.keterangan is distinct from old.keterangan then
+        if (new.kelurahan is distinct from old.kelurahan)
+            or (new.nomor_hak is distinct from old.nomor_hak)
+            or (new.surat_ukur is distinct from old.surat_ukur)
+            or (new.nib is distinct from old.nib)
+            or (new.luas is distinct from old.luas)
+            or (new.produk is distinct from old.produk)
+            or (new.luas_peta is distinct from old.luas_peta)
+            or (new.validator_tekstual is distinct from old.validator_tekstual)
+            or (new.validator_peta is distinct from old.validator_peta)
+            or (new.blokir_internal is distinct from old.blokir_internal)
+            or (new.kw is distinct from old.kw)
+            or (new.pemilik_pertama is distinct from old.pemilik_pertama)
+            or (new.pemilik_akhir is distinct from old.pemilik_akhir)
+            or (new.tipe_hak is distinct from old.tipe_hak)
+        then
+            new.keterangan = old.keterangan;
+        end if;
+    end if;
+    return new;
+end;
+$$;
+
+drop trigger if exists trg_preserve_selesai on public.kwalitas_data_cimahi;
+create trigger trg_preserve_selesai
+    before update on public.kwalitas_data_cimahi
+    for each row
+    execute function public.preserve_selesai_keterangan();
