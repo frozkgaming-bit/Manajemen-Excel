@@ -1,7 +1,10 @@
-import { supabaseClient, TABLE_NAME, DB_COLUMNS } from '../config/supabase.js';
+import { supabaseClient, TABLE_NAME, DB_COLUMNS, ID_COLUMNS } from '../config/supabase.js';
 import { fetchServerCounts } from './stats.js';
-import { setupHeadersIfNeeded, fetchAllDataConcurrently, getHeaders, resetPagination, fetchPaginatedData } from './table.js';
+import { fetchAllDataConcurrently, resetPagination, fetchPaginatedData } from './table.js';
 import { showProgress, updateProgress, hideProgress } from './progress.js';
+
+const ON_CONFLICT_COLUMNS = ID_COLUMNS.join(',');
+const DATA_COLUMNS = DB_COLUMNS.filter(c => c !== 'keterangan' && !ID_COLUMNS.includes(c));
 
 function cleanSuratUkur(value) {
     const str = toCellString(value);
@@ -10,9 +13,6 @@ function cleanSuratUkur(value) {
     if (match) return `${match[1].trim()}/${match[2]}`;
     return str;
 }
-
-const ON_CONFLICT_COLUMNS = DB_COLUMNS.filter(c => c !== 'keterangan').join(',');
-const DATA_COLUMNS = DB_COLUMNS.filter(c => c !== 'keterangan');
 
 // Semua kolom DB bertipe string — seluruh nilai Excel dipaksa jadi string
 // sebelum signature/upsert, supaya angka di Excel ("238") identik dengan
@@ -38,6 +38,14 @@ function buildSignature(row, cols) {
     return cols.map(col => toCellString(row[col])).join('__');
 }
 
+function isSelesai(row) {
+    return !!(row.keterangan && row.keterangan.toLowerCase() === 'selesai');
+}
+
+function hasIdentifier(row) {
+    return ID_COLUMNS.every(c => toCellString(row[c]) !== '');
+}
+
 function normalizeExcelRow(row) {
     const normalizedRow = {};
 
@@ -56,23 +64,54 @@ function normalizeExcelRow(row) {
     return normalizedRow;
 }
 
+// Payload upsert: identifier + keterangan selalu dikirim.
+// Kolom data non-identifier hanya dikirim jika tidak kosong —
+// mencegah "" menimpa nilai DB yang ada saat UPDATE.
+function toUpsertPayload(item) {
+    const payload = {};
+    ID_COLUMNS.forEach(c => { payload[c] = toCellString(item[c]); });
+    DATA_COLUMNS.forEach(c => {
+        const v = toCellString(item[c]);
+        if (v !== '') payload[c] = v;
+    });
+    payload.keterangan = item.keterangan || 'Belum Selesai';
+    return payload;
+}
+
+// Dedup by identifier: 1 baris per (kelurahan, nomor_hak, surat_ukur, nib).
+// Prefer 'Selesai'; jika tidak, baris terakhir menang (data terbaru).
+function dedupByIdentifier(rows) {
+    const idMap = new Map();
+    rows.forEach(item => {
+        const key = buildSignature(item, ID_COLUMNS);
+        if (!idMap.has(key)) {
+            idMap.set(key, item);
+            return;
+        }
+        const existing = idMap.get(key);
+        if (isSelesai(item) || !isSelesai(existing)) {
+            idMap.set(key, item);
+        }
+    });
+    return Array.from(idMap.values());
+}
+
 function validateExcelHeaders(rawHeaders) {
     const excelHeaders = new Set(rawHeaders.map(h => normalizeHeader(h)));
-    const missing = DATA_COLUMNS.filter(c => !excelHeaders.has(c));
-    const matched = DATA_COLUMNS.length - missing.length;
+    const missing = DB_COLUMNS.filter(c => !excelHeaders.has(c));
+    const matched = DB_COLUMNS.length - missing.length;
 
     if (matched === 0) {
         return { ok: false, missing, message: 'Tidak ada kolom Excel yang cocok dengan database. Periksa nama header file.' };
     }
 
-    const identifierCols = ['kelurahan', 'nomor_hak', 'surat_ukur', 'nib'];
-    const missingIdentifiers = identifierCols.filter(c => missing.includes(c));
+    const missingIdentifiers = ID_COLUMNS.filter(c => missing.includes(c));
     if (missingIdentifiers.length > 0) {
         return { ok: false, missing, message: `Kolom identifier wajib tidak ditemukan di Excel: ${missingIdentifiers.join(', ')}` };
     }
 
     if (missing.length > 0) {
-        console.warn('Kolom Excel tidak ditemukan (akan diisi kosong):', missing);
+        console.warn('Kolom Excel tidak ditemukan (tidak dikirim saat upsert):', missing);
     }
     return { ok: true, missing };
 }
@@ -111,8 +150,9 @@ export async function sendToBackendInChunks(dataArray, chunkSize = 10000) {
         throw new Error('Sesi login sudah berakhir. Silakan login kembali.');
     }
 
+    const payloads = dataArray.map(toUpsertPayload);
     let successCount = 0;
-    const total = dataArray.length;
+    const total = payloads.length;
 
     showProgress("Mengunggah Data ke Database", 0, `0 / ${total.toLocaleString('id-ID')} baris (0%)`);
 
@@ -123,21 +163,25 @@ export async function sendToBackendInChunks(dataArray, chunkSize = 10000) {
 
     const totalChunks = Math.ceil(total / chunkSize);
     const errors = [];
+    let failedBatch = -1;
+
     for (let i = 0; i < totalChunks; i++) {
         const from = i * chunkSize;
-        const chunk = dataArray.slice(from, from + chunkSize);
+        const chunk = payloads.slice(from, from + chunkSize);
 
-        const { error } = await supabaseClient
+        const { data: returned, error } = await supabaseClient
             .from(TABLE_NAME)
-            .upsert(chunk, { onConflict: ON_CONFLICT_COLUMNS });
+            .upsert(chunk, { onConflict: ON_CONFLICT_COLUMNS })
+            .select('id');
 
         if (error) {
             console.error(`Gagal batch ${i + 1}:`, error.message);
             errors.push(`Batch ${i + 1}: ${error.message}`);
+            failedBatch = i + 1;
             break;
-        } else {
-            successCount += chunk.length;
         }
+
+        successCount += (returned && returned.length) || chunk.length;
 
         const percent = Math.min(100, Math.round((successCount / total) * 100));
         updateProgress(percent, `Mengunggah: ${successCount.toLocaleString('id-ID')} / ${total.toLocaleString('id-ID')} baris (${percent}%)`);
@@ -149,7 +193,10 @@ export async function sendToBackendInChunks(dataArray, chunkSize = 10000) {
     if (uploadButton) uploadButton.disabled = false;
 
     if (errors.length > 0) {
-        throw new Error(`Gagal mengunggah ${errors.length} batch. ${errors[0]}`);
+        const savedNote = successCount > 0
+            ? ` ${successCount.toLocaleString('id-ID')} baris pada batch sebelumnya sudah tersimpan.`
+            : '';
+        throw new Error(`Gagal di batch ${failedBatch}/${totalChunks}. ${errors[0]}.${savedNote}`);
     }
 
     updateProgress(100, `Selesai! Berhasil menyimpan ${successCount.toLocaleString('id-ID')} baris.`);
@@ -258,55 +305,44 @@ export function initExcelHandlers() {
                             if (row.surat_ukur) row.surat_ukur = cleanSuratUkur(row.surat_ukur);
                         });
 
-                        setupHeadersIfNeeded();
-                        let headers = getHeaders();
-                        const dataColumns = headers.filter(h => h !== 'keterangan');
-                        let uniqueMap = new Map();
+                        const withId = newData.filter(hasIdentifier);
+                        const skippedNoId = newData.length - withId.length;
 
-                        newData.forEach(item => {
-                            let signature = buildSignature(item, dataColumns);
-                            if (!uniqueMap.has(signature)) {
-                                uniqueMap.set(signature, item);
-                            } else {
-                                const existing = uniqueMap.get(signature);
-                                if (item.keterangan && item.keterangan.toLowerCase() === 'selesai') {
-                                    uniqueMap.set(signature, item);
-                                }
-                            }
-                        });
-
-                        let cleanedNewData = Array.from(uniqueMap.values());
+                        const cleanedNewData = dedupByIdentifier(withId);
 
                         updateProgress(30, "Memeriksa data 'Selesai' yang sudah ada...");
-                        const existingSelesai = await fetchAllSelesaiRows(dataColumns);
+                        const existingSelesai = await fetchAllSelesaiRows(ID_COLUMNS);
 
                         const selesaiSignatures = new Set();
                         existingSelesai.forEach(row => {
-                            selesaiSignatures.add(buildSignature(row, dataColumns));
+                            selesaiSignatures.add(buildSignature(row, ID_COLUMNS));
                         });
 
                         updateProgress(50, `Menyaring data... ${selesaiSignatures.size} data 'Selesai' sudah ada di database.`);
 
                         const toUpload = [];
-                        let skippedCount = 0;
+                        let skippedSelesai = 0;
                         cleanedNewData.forEach(item => {
-                            let dataSig = buildSignature(item, dataColumns);
-                            if (item.keterangan && item.keterangan.toLowerCase() === 'selesai') {
+                            const idSig = buildSignature(item, ID_COLUMNS);
+                            if (isSelesai(item)) {
                                 toUpload.push(item);
-                            } else if (selesaiSignatures.has(dataSig)) {
-                                skippedCount++;
+                            } else if (selesaiSignatures.has(idSig)) {
+                                skippedSelesai++;
                             } else {
                                 toUpload.push(item);
                             }
                         });
 
-                        if (skippedCount > 0) {
-                            updateProgress(60, `Dilewati: ${skippedCount} baris sudah 'Selesai' di database.`);
+                        const skipNotes = [];
+                        if (skippedNoId > 0) skipNotes.push(`${skippedNoId} baris tanpa identifier lengkap`);
+                        if (skippedSelesai > 0) skipNotes.push(`${skippedSelesai} baris sudah 'Selesai' di database`);
+                        if (skipNotes.length > 0) {
+                            updateProgress(60, `Dilewati: ${skipNotes.join(', ')}.`);
                         }
 
                         if (toUpload.length === 0) {
                             hideProgress();
-                            alert(`Tidak ada data baru untuk diunggah.\n${skippedCount} baris dilewati (sudah 'Selesai' di database).`);
+                            alert(`Tidak ada data baru untuk diunggah.\n${skipNotes.join('\n') || '0 baris.'}`);
                             resetUploadState();
                             return;
                         }

@@ -29,19 +29,22 @@ create policy "authenticated users can update kwalitas data"
     using (true)
     with check (true);
 
--- Unique index yang dibutuhkan oleh client-side upsert
--- (onConflict di excel.js = semua kolom kecuali keterangan).
--- Tanpa index ini, setiap upsert gagal dengan error:
--- "there is no unique or exclusion constraint matching the ON CONFLICT specification"
-create unique index if not exists uq_kwalitas_data_cimahi_natural_key
-    on public.kwalitas_data_cimahi
-    (kelurahan, nomor_hak, surat_ukur, nib, luas, produk, luas_peta,
-     validator_tekstual, validator_peta, blokir_internal, kw,
-     pemilik_pertama, pemilik_akhir, tipe_hak);
+-- Unique index untuk ON CONFLICT client-side upsert.
+-- Conflict key = identifier properti SAJA (bukan kolom mutable),
+-- supaya update data (luas, produk, dll) tetap match baris lama
+-- alih-alih INSERT baris duplikat.
+-- NULLS NOT DISTINCT: NULL di identifier match NULL lain (PG15+).
+drop index if exists uq_kwalitas_data_cimahi_natural_key;
 
--- Trigger: pertahankan keterangan 'Selesai' saat upsert Excel
--- menimpa baris yang sudah Selesai (kolom data ikut berubah).
--- Update checkbox di UI hanya mengubah keterangan → tetap diperbolehkan.
+create unique index if not exists uq_kwalitas_data_cimahi_identifier
+    on public.kwalitas_data_cimahi
+    (kelurahan, nomor_hak, surat_ukur, nib)
+    nulls not distinct;
+
+-- Trigger: pertahankan keterangan 'Selesai' saat upsert Excel menimpa baris
+-- yang sudah Selesai. Memicu jika keterangan berubah DAN minimal satu kolom
+-- data ikut berubah (pola upsert). Update checkbox UI hanya mengubah
+-- keterangan → kolom data tidak berubah → tetap diperbolehkan.
 create or replace function public.preserve_selesai_keterangan()
 returns trigger
 language plpgsql

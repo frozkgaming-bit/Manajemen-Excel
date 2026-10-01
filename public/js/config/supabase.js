@@ -6,8 +6,11 @@ export const BUCKET_NAME = 'cad_files';
 export const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 export const DB_COLUMNS = [
-    'kelurahan', 'nomor_hak', 'surat_ukur', 'nib', 'luas', 
-    'produk', 'luas_peta', 'validator_tekstual', 'validator_peta', 
-    'blokir_internal', 'kw', 'pemilik_pertama', 'pemilik_akhir', 
+    'kelurahan', 'nomor_hak', 'surat_ukur', 'nib', 'luas',
+    'produk', 'luas_peta', 'validator_tekstual', 'validator_peta',
+    'blokir_internal', 'kw', 'pemilik_pertama', 'pemilik_akhir',
     'tipe_hak', 'keterangan'
 ];
+
+// Natural key untuk upsert — hanya identifier properti, bukan kolom mutable
+export const ID_COLUMNS = ['kelurahan', 'nomor_hak', 'surat_ukur', 'nib'];
