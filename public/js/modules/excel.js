@@ -6,18 +6,35 @@ import { showProgress, updateProgress, hideProgress } from './progress.js';
 const ON_CONFLICT_COLUMNS = ID_COLUMNS.join(',');
 const DATA_COLUMNS = DB_COLUMNS.filter(c => c !== 'keterangan' && !ID_COLUMNS.includes(c));
 
-function cleanSuratUkur(value) {
+export function cleanSuratUkur(value) {
     const str = toCellString(value);
     if (!str) return "";
-    const match = str.match(/^((?:SU|GS)?[.\s]?\d+)\/[^/]+\/(\d{4})$/i);
-    if (match) return `${match[1].trim()}/${match[2]}`;
-    return str;
+
+    const normalized = str.replace(/\s*\/\s*/g, '/').replace(/\s+/g, ' ').trim();
+    const parts = normalized.split('/');
+    if (parts.length !== 3 || !/^\d{4}$/.test(parts[2].trim())) return normalized;
+
+    const head = parts[0].trim();
+    const m2 = head.match(/^(SU|GS)[.\s-]*(\d+)$/i);
+    if (m2) return `${m2[1].toUpperCase()} ${m2[2]}/${parts[2].trim()}`;
+    return `${head.replace(/\s+/g, ' ')}/${parts[2].trim()}`;
+}
+
+function normalizeIdentifierValue(column, value) {
+    const str = toCellString(value);
+    if (!str) return '';
+
+    if (column === 'surat_ukur') {
+        return cleanSuratUkur(str);
+    }
+
+    return str.replace(/\s+/g, ' ').trim();
 }
 
 // Semua kolom DB bertipe string — seluruh nilai Excel dipaksa jadi string
 // sebelum signature/upsert, supaya angka di Excel ("238") identik dengan
 // teks di DB ("238") dan ON CONFLICT bisa match.
-function toCellString(value) {
+export function toCellString(value) {
     if (value === undefined || value === null) return '';
     if (value instanceof Date) {
         const y = value.getFullYear();
@@ -34,8 +51,8 @@ function normalizeHeader(header) {
         .replace(/[\s-]+/g, '_');
 }
 
-function buildSignature(row, cols) {
-    return cols.map(col => toCellString(row[col])).join('__');
+export function buildSignature(row, cols) {
+    return cols.map(col => normalizeIdentifierValue(col, row[col])).join('__');
 }
 
 function isSelesai(row) {
@@ -43,7 +60,7 @@ function isSelesai(row) {
 }
 
 function hasIdentifier(row) {
-    return ID_COLUMNS.every(c => toCellString(row[c]) !== '');
+    return ID_COLUMNS.every(c => normalizeIdentifierValue(c, row[c]) !== '');
 }
 
 function normalizeExcelRow(row) {
@@ -69,7 +86,7 @@ function normalizeExcelRow(row) {
 // mencegah "" menimpa nilai DB yang ada saat UPDATE.
 function toUpsertPayload(item) {
     const payload = {};
-    ID_COLUMNS.forEach(c => { payload[c] = toCellString(item[c]); });
+    ID_COLUMNS.forEach(c => { payload[c] = normalizeIdentifierValue(c, item[c]); });
     DATA_COLUMNS.forEach(c => {
         const v = toCellString(item[c]);
         if (v !== '') payload[c] = v;
