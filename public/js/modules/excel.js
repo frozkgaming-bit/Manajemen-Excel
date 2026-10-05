@@ -17,10 +17,9 @@ export function cleanSuratUkur(value) {
     const parts = normalized.split('/');
     if (parts.length !== 3 || !/^\d{4}$/.test(parts[2].trim())) return normalized;
 
-    const head = parts[0].trim();
-    const m2 = head.match(/^(SU|GS)[.\s-]*(\d+)$/i);
-    if (m2) return `${m2[1].toUpperCase()} ${m2[2]}/${parts[2].trim()}`;
-    return `${head.replace(/\s+/g, ' ')}/${parts[2].trim()}`;
+    // Bagian tengah (mis. nama kelurahan) dibuang; kepala ('SU.00885', 'GS.00797')
+    // dipertahankan apa adanya, sama seperti data yang sudah tersimpan di database.
+    return `${parts[0].trim()}/${parts[2].trim()}`;
 }
 
 function normalizeIdentifierValue(column, value) {
@@ -37,6 +36,16 @@ function normalizeIdentifierValue(column, value) {
 // Semua kolom DB bertipe string — seluruh nilai Excel dipaksa jadi string
 // sebelum signature/upsert, supaya angka di Excel ("238") identik dengan
 // teks di DB ("238") dan ON CONFLICT bisa match.
+// Buang karakter yang membuat Postgres/jsonb menolak seluruh batch:
+//  - NUL (\u0000)            -> error 22P05 "unsupported Unicode escape sequence"
+//  - CR (\r) & karakter kontrol lain -> dibuang (tab dan baris baru \n dipertahankan)
+//  - surrogate yatim         -> emoji/karakter rusak -> error 22P05
+function stripUnsafeChars(str) {
+    return str
+        .replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, '')
+        .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '');
+}
+
 export function toCellString(value) {
     if (value === undefined || value === null) return '';
     if (value instanceof Date) {
@@ -45,7 +54,7 @@ export function toCellString(value) {
         const d = String(value.getDate()).padStart(2, '0');
         return `${y}-${m}-${d}`;
     }
-    return String(value).trim();
+    return stripUnsafeChars(String(value)).trim();
 }
 
 function normalizeHeader(header) {
@@ -68,8 +77,11 @@ function isSelesai(row) {
     return normalizeKeterangan(row.keterangan) === 'Selesai';
 }
 
-function hasIdentifier(row) {
-    return ID_COLUMNS.every(c => normalizeIdentifierValue(c, row[c]) !== '');
+// Baris hanya dilewati bila SEMUA kolom datanya kosong (mis. baris sisa di bawah tabel).
+// Kolom apa pun boleh kosong (kelurahan, nomor hak, NIB, surat ukur, dst.); keunikan
+// baris ditentukan oleh seluruh kolom, bukan oleh identifier.
+function hasAnyData(row) {
+    return ROW_COLUMNS.some(c => toCellString(row[c]) !== '');
 }
 
 function normalizeExcelRow(row) {
@@ -138,6 +150,16 @@ function validateExcelHeaders(rawHeaders) {
     return { ok: true, missing };
 }
 
+// Pesan error lengkap (kode + detail + petunjuk) supaya penyebab asli terlihat,
+// mis. 42501 = belum ada GRANT, PGRST202 = fungsi belum ada, 57014 = timeout.
+function formatSupabaseError(error) {
+    const parts = [error.message];
+    if (error.code) parts.push(`[kode ${error.code}]`);
+    if (error.details) parts.push(String(error.details));
+    if (error.hint) parts.push(`Petunjuk: ${error.hint}`);
+    return parts.filter(Boolean).join(' ');
+}
+
 export async function sendToBackendInChunks(dataArray, chunkSize = 2000) {
     const summary = { total: 0, inserted: 0, promoted: 0, skipped: 0 };
     if (!dataArray || dataArray.length === 0) return summary;
@@ -171,8 +193,8 @@ export async function sendToBackendInChunks(dataArray, chunkSize = 2000) {
             .rpc('upsert_kwalitas_batch', { rows: chunk });
 
         if (error) {
-            console.error(`Gagal batch ${i + 1}:`, error.message);
-            errors.push(`Batch ${i + 1}: ${error.message}`);
+            console.error(`Gagal batch ${i + 1}:`, error);
+            errors.push(`Batch ${i + 1}: ${formatSupabaseError(error)}`);
             failedBatch = i + 1;
             break;
         }
@@ -310,7 +332,7 @@ export function initExcelHandlers() {
                             if (row.surat_ukur) row.surat_ukur = cleanSuratUkur(row.surat_ukur);
                         });
 
-                        const withId = newData.filter(hasIdentifier);
+                        const withId = newData.filter(hasAnyData);
                         const skippedNoId = newData.length - withId.length;
 
                         const cleanedNewData = dedupByRow(withId);
@@ -321,7 +343,7 @@ export function initExcelHandlers() {
                         const dupInFile = withId.length - cleanedNewData.length;
 
                         const skipNotes = [];
-                        if (skippedNoId > 0) skipNotes.push(`${skippedNoId} baris tanpa identifier lengkap`);
+                        if (skippedNoId > 0) skipNotes.push(`${skippedNoId} baris kosong (semua kolom kosong)`);
                         if (dupInFile > 0) skipNotes.push(`${dupInFile} baris identik di dalam file`);
                         if (skipNotes.length > 0) {
                             updateProgress(40, `Dilewati: ${skipNotes.join(', ')}.`);
