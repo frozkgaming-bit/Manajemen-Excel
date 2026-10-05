@@ -3,7 +3,6 @@ import { fetchServerCounts } from './stats.js';
 import { fetchAllDataConcurrently, resetPagination, fetchPaginatedData } from './table.js';
 import { showProgress, updateProgress, hideProgress } from './progress.js';
 
-const ON_CONFLICT_COLUMNS = ID_COLUMNS.join(',');
 const DATA_COLUMNS = DB_COLUMNS.filter(c => c !== 'keterangan' && !ID_COLUMNS.includes(c));
 
 export function cleanSuratUkur(value) {
@@ -55,8 +54,14 @@ export function buildSignature(row, cols) {
     return cols.map(col => normalizeIdentifierValue(col, row[col])).join('__');
 }
 
+// Hanya dua nilai yang valid di DB: 'Selesai' dan 'Belum Selesai'.
+// 'selesai' / 'SELESAI' / ' Selesai ' semuanya jadi 'Selesai'.
+function normalizeKeterangan(value) {
+    return toCellString(value).toLowerCase() === 'selesai' ? 'Selesai' : 'Belum Selesai';
+}
+
 function isSelesai(row) {
-    return !!(row.keterangan && row.keterangan.toLowerCase() === 'selesai');
+    return normalizeKeterangan(row.keterangan) === 'Selesai';
 }
 
 function hasIdentifier(row) {
@@ -77,21 +82,18 @@ function normalizeExcelRow(row) {
         if (normalizedRow[col] === undefined) normalizedRow[col] = '';
     });
 
-    if (!normalizedRow.keterangan) normalizedRow.keterangan = 'Belum Selesai';
+    normalizedRow.keterangan = normalizeKeterangan(normalizedRow.keterangan);
     return normalizedRow;
 }
 
-// Payload upsert: identifier + keterangan selalu dikirim.
-// Kolom data non-identifier hanya dikirim jika tidak kosong —
-// mencegah "" menimpa nilai DB yang ada saat UPDATE.
+// Payload untuk fungsi SQL upsert_kwalitas_batch.
+// Semua baris WAJIB punya key yang sama persis (semua kolom, selalu string).
+// Sel kosong dikirim '' dan diubah jadi NULL oleh fungsi SQL.
 function toUpsertPayload(item) {
     const payload = {};
     ID_COLUMNS.forEach(c => { payload[c] = normalizeIdentifierValue(c, item[c]); });
-    DATA_COLUMNS.forEach(c => {
-        const v = toCellString(item[c]);
-        if (v !== '') payload[c] = v;
-    });
-    payload.keterangan = item.keterangan || 'Belum Selesai';
+    DATA_COLUMNS.forEach(c => { payload[c] = toCellString(item[c]); });
+    payload.keterangan = normalizeKeterangan(item.keterangan);
     return payload;
 }
 
@@ -133,33 +135,9 @@ function validateExcelHeaders(rawHeaders) {
     return { ok: true, missing };
 }
 
-async function fetchAllSelesaiRows(cols) {
-    const selectCols = cols.join(',');
-    const pageSize = 1000;
-    const all = [];
-    let page = 0;
-
-    while (true) {
-        const from = page * pageSize;
-        const to = from + pageSize - 1;
-        const { data, error } = await supabaseClient
-            .from(TABLE_NAME)
-            .select(selectCols)
-            .eq('keterangan', 'Selesai')
-            .order('id', { ascending: true })
-            .range(from, to);
-
-        if (error) throw new Error(`Gagal mengambil data 'Selesai' dari database: ${error.message}`);
-        if (!data || data.length === 0) break;
-        all.push(...data);
-        if (data.length < pageSize) break;
-        page++;
-    }
-    return all;
-}
-
-export async function sendToBackendInChunks(dataArray, chunkSize = 10000) {
-    if (!dataArray || dataArray.length === 0) return;
+export async function sendToBackendInChunks(dataArray, chunkSize = 2000) {
+    const summary = { total: 0, inserted: 0, promoted: 0, skipped: 0 };
+    if (!dataArray || dataArray.length === 0) return summary;
 
     const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
     if (sessionError) throw new Error(`Gagal memeriksa sesi login: ${sessionError.message}`);
@@ -168,7 +146,7 @@ export async function sendToBackendInChunks(dataArray, chunkSize = 10000) {
     }
 
     const payloads = dataArray.map(toUpsertPayload);
-    let successCount = 0;
+    let processed = 0;
     const total = payloads.length;
 
     showProgress("Mengunggah Data ke Database", 0, `0 / ${total.toLocaleString('id-ID')} baris (0%)`);
@@ -186,10 +164,8 @@ export async function sendToBackendInChunks(dataArray, chunkSize = 10000) {
         const from = i * chunkSize;
         const chunk = payloads.slice(from, from + chunkSize);
 
-        const { data: returned, error } = await supabaseClient
-            .from(TABLE_NAME)
-            .upsert(chunk, { onConflict: ON_CONFLICT_COLUMNS })
-            .select('id');
+        const { data: result, error } = await supabaseClient
+            .rpc('upsert_kwalitas_batch', { rows: chunk });
 
         if (error) {
             console.error(`Gagal batch ${i + 1}:`, error.message);
@@ -198,10 +174,16 @@ export async function sendToBackendInChunks(dataArray, chunkSize = 10000) {
             break;
         }
 
-        successCount += (returned && returned.length) || chunk.length;
+        processed += chunk.length;
+        if (result) {
+            summary.inserted += result.inserted || 0;
+            summary.promoted += result.promoted || 0;
+            summary.skipped += result.skipped || 0;
+        }
+        summary.total = processed;
 
-        const percent = Math.min(100, Math.round((successCount / total) * 100));
-        updateProgress(percent, `Mengunggah: ${successCount.toLocaleString('id-ID')} / ${total.toLocaleString('id-ID')} baris (${percent}%)`);
+        const percent = Math.min(100, Math.round((processed / total) * 100));
+        updateProgress(percent, `Memproses: ${processed.toLocaleString('id-ID')} / ${total.toLocaleString('id-ID')} baris (${percent}%)`);
 
         await new Promise(r => setTimeout(r, 10));
     }
@@ -210,24 +192,27 @@ export async function sendToBackendInChunks(dataArray, chunkSize = 10000) {
     if (uploadButton) uploadButton.disabled = false;
 
     if (errors.length > 0) {
-        const savedNote = successCount > 0
-            ? ` ${successCount.toLocaleString('id-ID')} baris pada batch sebelumnya sudah tersimpan.`
+        const savedNote = processed > 0
+            ? ` ${processed.toLocaleString('id-ID')} baris pada batch sebelumnya sudah diproses.`
             : '';
         throw new Error(`Gagal di batch ${failedBatch}/${totalChunks}. ${errors[0]}.${savedNote}`);
     }
 
-    updateProgress(100, `Selesai! Berhasil menyimpan ${successCount.toLocaleString('id-ID')} baris.`);
+    const fmt = n => n.toLocaleString('id-ID');
+    const ringkas = `${fmt(summary.inserted)} baru, ${fmt(summary.promoted)} jadi 'Selesai', ${fmt(summary.skipped)} dilewati (sudah ada).`;
+    updateProgress(100, `Selesai! ${ringkas}`);
     setTimeout(() => {
         hideProgress();
         const toast = document.getElementById('excelUploadToast');
         if (toast) {
-            toast.innerHTML = `<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg><span>File berhasil diupload — ${successCount.toLocaleString('id-ID')} baris tersimpan ke database.</span>`;
+            toast.innerHTML = `<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg><span>File berhasil diupload — ${ringkas}</span>`;
             toast.classList.remove('hidden');
             setTimeout(() => toast.classList.add('hidden'), 10000);
         }
     }, 500);
 
     fetchServerCounts();
+    return summary;
 }
 
 export function initExcelHandlers() {
@@ -327,45 +312,27 @@ export function initExcelHandlers() {
 
                         const cleanedNewData = dedupByIdentifier(withId);
 
-                        updateProgress(30, "Memeriksa data 'Selesai' yang sudah ada...");
-                        const existingSelesai = await fetchAllSelesaiRows(ID_COLUMNS);
-
-                        const selesaiSignatures = new Set();
-                        existingSelesai.forEach(row => {
-                            selesaiSignatures.add(buildSignature(row, ID_COLUMNS));
-                        });
-
-                        updateProgress(50, `Menyaring data... ${selesaiSignatures.size} data 'Selesai' sudah ada di database.`);
-
-                        const toUpload = [];
-                        let skippedSelesai = 0;
-                        cleanedNewData.forEach(item => {
-                            const idSig = buildSignature(item, ID_COLUMNS);
-                            if (isSelesai(item)) {
-                                toUpload.push(item);
-                            } else if (selesaiSignatures.has(idSig)) {
-                                skippedSelesai++;
-                            } else {
-                                toUpload.push(item);
-                            }
-                        });
+                        // Filter duplikat & aturan Selesai dijalankan di database
+                        // (fungsi upsert_kwalitas_batch), bukan di browser.
+                        const toUpload = cleanedNewData;
+                        const dupInFile = withId.length - cleanedNewData.length;
 
                         const skipNotes = [];
                         if (skippedNoId > 0) skipNotes.push(`${skippedNoId} baris tanpa identifier lengkap`);
-                        if (skippedSelesai > 0) skipNotes.push(`${skippedSelesai} baris sudah 'Selesai' di database`);
+                        if (dupInFile > 0) skipNotes.push(`${dupInFile} baris kembar di dalam file`);
                         if (skipNotes.length > 0) {
-                            updateProgress(60, `Dilewati: ${skipNotes.join(', ')}.`);
+                            updateProgress(40, `Dilewati: ${skipNotes.join(', ')}.`);
                         }
 
                         if (toUpload.length === 0) {
                             hideProgress();
-                            alert(`Tidak ada data baru untuk diunggah.\n${skipNotes.join('\n') || '0 baris.'}`);
+                            alert(`Tidak ada data untuk diunggah.\n${skipNotes.join('\n') || '0 baris.'}`);
                             resetUploadState();
                             return;
                         }
 
                         try {
-                            await sendToBackendInChunks(toUpload, 10000);
+                            await sendToBackendInChunks(toUpload);
                         } catch (error) {
                             console.error('Gagal mengunggah data Excel:', error);
                             hideProgress();
