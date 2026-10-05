@@ -4,6 +4,10 @@ import { fetchAllDataConcurrently, resetPagination, fetchPaginatedData } from '.
 import { showProgress, updateProgress, hideProgress } from './progress.js';
 
 const DATA_COLUMNS = DB_COLUMNS.filter(c => c !== 'keterangan' && !ID_COLUMNS.includes(c));
+// Satu baris dianggap duplikat HANYA jika SEMUA kolom ini sama persis.
+// Beda satu nilai saja (mis. luas 100 vs 101) = baris unik.
+// 'keterangan' sengaja tidak ikut, supaya Belum Selesai -> Selesai tetap baris yang sama.
+const ROW_COLUMNS = DB_COLUMNS.filter(c => c !== 'keterangan');
 
 export function cleanSuratUkur(value) {
     const str = toCellString(value);
@@ -97,22 +101,21 @@ function toUpsertPayload(item) {
     return payload;
 }
 
-// Dedup by identifier: 1 baris per (kelurahan, nomor_hak, surat_ukur, nib).
-// Prefer 'Selesai'; jika tidak, baris terakhir menang (data terbaru).
-function dedupByIdentifier(rows) {
-    const idMap = new Map();
+// Dedup di dalam file: baris dianggap kembar hanya jika SEMUA kolom (kecuali
+// keterangan) identik dengan yang akan dikirim ke database. Baris yang beda
+// satu nilai saja tetap dikirim semua. Jika kembar: prefer 'Selesai'; jika
+// sama-sama bukan Selesai, baris pertama dipertahankan.
+function dedupByRow(rows) {
+    const rowMap = new Map();
     rows.forEach(item => {
-        const key = buildSignature(item, ID_COLUMNS);
-        if (!idMap.has(key)) {
-            idMap.set(key, item);
-            return;
-        }
-        const existing = idMap.get(key);
-        if (isSelesai(item) || !isSelesai(existing)) {
-            idMap.set(key, item);
+        const payload = toUpsertPayload(item);
+        const key = JSON.stringify(ROW_COLUMNS.map(c => payload[c]));
+        const existing = rowMap.get(key);
+        if (!existing || (isSelesai(item) && !isSelesai(existing))) {
+            rowMap.set(key, item);
         }
     });
-    return Array.from(idMap.values());
+    return Array.from(rowMap.values());
 }
 
 function validateExcelHeaders(rawHeaders) {
@@ -310,16 +313,16 @@ export function initExcelHandlers() {
                         const withId = newData.filter(hasIdentifier);
                         const skippedNoId = newData.length - withId.length;
 
-                        const cleanedNewData = dedupByIdentifier(withId);
+                        const cleanedNewData = dedupByRow(withId);
 
-                        // Filter duplikat & aturan Selesai dijalankan di database
-                        // (fungsi upsert_kwalitas_batch), bukan di browser.
+                        // Filter duplikat (seluruh kolom identik) & aturan Selesai dijalankan di
+                        // database (fungsi upsert_kwalitas_batch), bukan di browser.
                         const toUpload = cleanedNewData;
                         const dupInFile = withId.length - cleanedNewData.length;
 
                         const skipNotes = [];
                         if (skippedNoId > 0) skipNotes.push(`${skippedNoId} baris tanpa identifier lengkap`);
-                        if (dupInFile > 0) skipNotes.push(`${dupInFile} baris kembar di dalam file`);
+                        if (dupInFile > 0) skipNotes.push(`${dupInFile} baris identik di dalam file`);
                         if (skipNotes.length > 0) {
                             updateProgress(40, `Dilewati: ${skipNotes.join(', ')}.`);
                         }
