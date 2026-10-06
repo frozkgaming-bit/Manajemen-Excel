@@ -30,20 +30,48 @@ function normalizeIdentifierValue(column, value) {
         return cleanSuratUkur(str);
     }
 
-    return str.replace(/\s+/g, ' ').trim();
+    return str.replace(/\n/g, ' ');
 }
 
 // Semua kolom DB bertipe string — seluruh nilai Excel dipaksa jadi string
 // sebelum signature/upsert, supaya angka di Excel ("238") identik dengan
 // teks di DB ("238") dan ON CONFLICT bisa match.
-// Buang karakter yang membuat Postgres/jsonb menolak seluruh batch:
-//  - NUL (\u0000)            -> error 22P05 "unsupported Unicode escape sequence"
-//  - CR (\r) & karakter kontrol lain -> dibuang (tab dan baris baru \n dipertahankan)
-//  - surrogate yatim         -> emoji/karakter rusak -> error 22P05
-function stripUnsafeChars(str) {
-    return str
-        .replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, '')
-        .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '');
+// ============================================================================
+// PEMBERSIHAN DATA — berlaku untuk SEMUA kolom.
+// Aturan ini HARUS identik dengan fungsi kwalitas_canon() di supabase_setup_baru.sql,
+// karena database memakai aturan yang sama saat membandingkan data lama dan baru.
+//   1. Surrogate yatim (emoji rusak)                          -> dibuang
+//   2. Bentuk unicode dinormalkan (NFC): 'é' satu karakter = 'e' + aksen
+//   3. Pemisah baris unicode (U+2028/2029)                    -> enter biasa
+//   4. NUL, CR (\r), karakter kontrol, soft-hyphen, karakter
+//      tak terlihat (zero-width, BOM)                        -> dibuang
+//   5. Spasi, tab, NBSP dan spasi unicode berurutan           -> satu spasi
+//   6. Enter berurutan / enter dikelilingi spasi              -> satu enter
+//   7. Spasi & enter di awal dan akhir                        -> dibuang
+//   8. Hasil kosong                                           -> '' (jadi NULL di database)
+// Huruf besar/kecil, tanda baca, dan aksen TIDAK diubah.
+// ============================================================================
+export function cleanText(value) {
+    let s = String(value);
+    s = s.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '');
+    s = s.normalize('NFC');
+    s = s.replace(/[\u2028\u2029]/g, '\n');
+    s = s.replace(/[\u0000-\u0008\u000B-\u001F\u007F\u00AD\u200B-\u200D\u2060\uFEFF]/g, '');
+    s = s.replace(/[ \t\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]+/g, ' ');
+    s = s.replace(/ ?\n[ \n]*/g, '\n');
+    return s.replace(/^[ \n]+|[ \n]+$/g, '');
+}
+
+// Jumlah sel teks di file yang berubah setelah dibersihkan (untuk laporan ke pengguna).
+export function countCleanedCells(rawRows) {
+    let n = 0;
+    for (const row of rawRows) {
+        for (const k in row) {
+            const v = row[k];
+            if (typeof v === 'string' && v !== '' && cleanText(v) !== v) n++;
+        }
+    }
+    return n;
 }
 
 export function toCellString(value) {
@@ -54,7 +82,7 @@ export function toCellString(value) {
         const d = String(value.getDate()).padStart(2, '0');
         return `${y}-${m}-${d}`;
     }
-    return stripUnsafeChars(String(value)).trim();
+    return cleanText(value);
 }
 
 function normalizeHeader(header) {
@@ -160,7 +188,7 @@ function formatSupabaseError(error) {
     return parts.filter(Boolean).join(' ');
 }
 
-export async function sendToBackendInChunks(dataArray, chunkSize = 2000) {
+export async function sendToBackendInChunks(dataArray, chunkSize = 2000, extraNote = '') {
     const summary = { total: 0, inserted: 0, promoted: 0, skipped: 0 };
     if (!dataArray || dataArray.length === 0) return summary;
 
@@ -225,12 +253,13 @@ export async function sendToBackendInChunks(dataArray, chunkSize = 2000) {
 
     const fmt = n => n.toLocaleString('id-ID');
     const ringkas = `${fmt(summary.inserted)} baru, ${fmt(summary.promoted)} jadi 'Selesai', ${fmt(summary.skipped)} dilewati (sudah ada).`;
-    updateProgress(100, `Selesai! ${ringkas}`);
+    const catatan = extraNote ? ` ${extraNote}` : '';
+    updateProgress(100, `Selesai! ${ringkas}${catatan}`);
     setTimeout(() => {
         hideProgress();
         const toast = document.getElementById('excelUploadToast');
         if (toast) {
-            toast.innerHTML = `<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg><span>File berhasil diupload — ${ringkas}</span>`;
+            toast.innerHTML = `<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg><span>File berhasil diupload — ${ringkas}${catatan}</span>`;
             toast.classList.remove('hidden');
             setTimeout(() => toast.classList.add('hidden'), 10000);
         }
@@ -327,6 +356,12 @@ export function initExcelHandlers() {
                             return;
                         }
 
+                        // Pembersihan data semua kolom (lihat cleanText); hitung sel yang dirapikan
+                        const cleanedCells = countCleanedCells(rawData);
+                        const cleanNote = cleanedCells > 0
+                            ? `Pembersihan data: ${cleanedCells.toLocaleString('id-ID')} sel dirapikan (spasi/enter berlebih, karakter tak terlihat).`
+                            : '';
+
                         var newData = rawData.map(normalizeExcelRow);
                         newData.forEach(row => {
                             if (row.surat_ukur) row.surat_ukur = cleanSuratUkur(row.surat_ukur);
@@ -345,8 +380,8 @@ export function initExcelHandlers() {
                         const skipNotes = [];
                         if (skippedNoId > 0) skipNotes.push(`${skippedNoId} baris kosong (semua kolom kosong)`);
                         if (dupInFile > 0) skipNotes.push(`${dupInFile} baris identik di dalam file`);
-                        if (skipNotes.length > 0) {
-                            updateProgress(40, `Dilewati: ${skipNotes.join(', ')}.`);
+                        if (skipNotes.length > 0 || cleanNote) {
+                            updateProgress(40, [skipNotes.length ? `Dilewati: ${skipNotes.join(', ')}.` : '', cleanNote].filter(Boolean).join(' '));
                         }
 
                         if (toUpload.length === 0) {
@@ -357,7 +392,7 @@ export function initExcelHandlers() {
                         }
 
                         try {
-                            await sendToBackendInChunks(toUpload);
+                            await sendToBackendInChunks(toUpload, 2000, cleanNote);
                         } catch (error) {
                             console.error('Gagal mengunggah data Excel:', error);
                             hideProgress();
